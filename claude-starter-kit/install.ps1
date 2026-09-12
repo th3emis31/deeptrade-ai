@@ -23,7 +23,7 @@ Write-Host "Claude starter kit -> $Target"
 
 # 1. Copy files without overwriting
 $files = Get-ChildItem -Path $Kit -Recurse -File | Where-Object {
-  $_.Name -notin @("install.ps1","install.sh","README.md","gitignore.append")
+  $_.Name -notin @("install.ps1","install.sh","README.md","gitignore.append") -and $_.DirectoryName -notlike "*claude-md-sections*"
 }
 foreach ($f in $files) {
   $rel = $f.FullName.Substring($Kit.Length).TrimStart('\','/')
@@ -37,10 +37,44 @@ foreach ($f in $files) {
     } else { SKIP "CLAUDE.md" }
     continue
   }
-  if (Test-Path $dest) { SKIP $rel; continue }
+  if (Test-Path $dest) {
+    if ($rel -like "scripts\claude-hooks\*" -or $rel -like "scripts/claude-hooks/*") {
+      if ((Get-FileHash $f.FullName).Hash -ne (Get-FileHash $dest).Hash) {
+        $bk = Join-Path $Target (".claude\backups\kit-upgrade-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "\" + $rel)
+        New-Item -ItemType Directory -Force -Path (Split-Path $bk) | Out-Null
+        Copy-Item $dest $bk; Copy-Item $f.FullName $dest -Force; OK "$rel (updated, old copy in .claude\backups)"
+      } else { SKIP $rel }
+      continue
+    }
+    SKIP $rel; continue
+  }
   New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
   Copy-Item $f.FullName $dest
   OK $rel
+}
+
+# 1b. Append guardrail sections to CLAUDE.md when their heading is missing
+$claudeMd = Join-Path $Target "CLAUDE.md"
+foreach ($sec in Get-ChildItem (Join-Path $Kit "claude-md-sections") -Filter *.md) {
+  $marker = (Get-Content $sec.FullName | Where-Object { $_ -like "## *" } | Select-Object -First 1)
+  $cur = if (Test-Path $claudeMd) { Get-Content $claudeMd -Raw } else { "" }
+  if ($cur -notlike "*$marker*") { Add-Content -Path $claudeMd -Value (Get-Content $sec.FullName -Raw); OK "CLAUDE.md += $($marker.TrimStart('# '))" }
+}
+$lessons = Join-Path $Target ".claude\memory\LESSONS.md"
+if (Test-Path $lessons) { (Get-Content $lessons -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $lessons -NoNewline }
+
+# 1c. Merge new hooks into an existing settings.json (never removes anything)
+$sj = Join-Path $Target ".claude\settings.json"
+if ((Test-Path $sj) -and ((Get-Content $sj -Raw) -notmatch "dup-check\.sh")) {
+  $cfg = Get-Content $sj -Raw | ConvertFrom-Json
+  if (-not $cfg.hooks) { $cfg | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{}) }
+  if (-not $cfg.hooks.PostToolUse) { $cfg.hooks | Add-Member -NotePropertyName PostToolUse -NotePropertyValue @() }
+  $grp = $cfg.hooks.PostToolUse | Where-Object { $_.matcher -like "*Edit*" } | Select-Object -First 1
+  $newHook = [pscustomobject]@{ type = "command"; command = "bash scripts/claude-hooks/dup-check.sh"; timeout = 60 }
+  if ($grp) { $grp.hooks = @($grp.hooks) + $newHook }
+  else { $cfg.hooks.PostToolUse = @($cfg.hooks.PostToolUse) + [pscustomobject]@{ matcher = "Edit|Write|MultiEdit"; hooks = @($newHook) } }
+  $cfg | ConvertTo-Json -Depth 10 | Set-Content $sj
+  OK ".claude/settings.json += dup-check hook"
 }
 
 # 2. .gitignore (append missing lines)

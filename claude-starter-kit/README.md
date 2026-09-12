@@ -7,7 +7,8 @@ installs, in the target project:
 |-------|--------------|
 | **Memory / brain / context** | `CLAUDE.md` (auto-loaded every session, with the owner's prime directive: always improve, always safe, never delete, zero errors), `.claude/memory/NOTES.md` (dated decisions), `.claude/memory/BACKLOG.md` (ideas) |
 | **Loop** | `/improve-loop` skill: one safe, verified, committed improvement per run; combine with `/loop 30m /improve-loop` |
-| **Skills** | `/safe-upgrade`, `/smart-entry` (10-rule entry checklist), `/verify`, `/brain` |
+| **Skills** | `/safe-upgrade`, `/smart-entry` (10-rule entry checklist), `/verify`, `/brain`, `/dedupe`, `/backtest`, `/strategy`, `/train` |
+| **Guardrails** | "Mistake prevention" and "Backtesting, strategy and training rules" sections in `CLAUDE.md`; a duplicate-definition hook that reports any newly added function already defined elsewhere; `.claude/memory/LESSONS.md` (shown every session) and `BASELINE.md` (comparable metrics per backtest/model) |
 | **Tools** | Hooks: backup before every edit, compile/build check after every edit (Python, Node, JSON auto-detected), memory shown at session start, uncommitted-work reminder on stop. Safe permission allow/deny list. Two subagents: `entry-reviewer`, `build-fixer`. `.mcp.json` with context7 only (docs, no credentials); add others per project with `claude mcp add` |
 
 Nothing is ever overwritten: existing files are kept, an existing `CLAUDE.md` gets the kit's
@@ -51,6 +52,17 @@ hooks run through Git Bash on Windows, which Git for Windows installs.
 
 Approve the project hooks and MCP servers when Claude Code asks on first start, and log
 in to each server with `/mcp`.
+
+## Avoiding mistakes and duplication
+
+- Every edit runs `dup-check.sh`: a newly added function/class whose name already exists
+  elsewhere is reported back to Claude, which must consolidate instead of duplicating.
+- `/dedupe` lists all existing duplicate groups (`bash scripts/claude-hooks/dup-check.sh --all`)
+  and consolidates them one commit at a time without removing behaviour.
+- `/strategy` → `/backtest` → `/train` is the order: a written hypothesis, a leak-free
+  cost-aware backtest recorded in `BASELINE.md`, then versioned training that never
+  overwrites the live model and promotes only when better than the baseline.
+- Lessons from mistakes go to `.claude/memory/LESSONS.md` and are shown at session start.
 
 ## Customise
 
