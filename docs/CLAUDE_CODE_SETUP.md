@@ -120,3 +120,27 @@ git commit … && git push -u origin claude/<topic>
 - Hook not firing → check `claude --debug` output and that `scripts/claude-hooks/*.sh`
   are executable (`bash scripts/install-claude.sh` fixes permissions).
 - Want fewer prompts → run the built-in `/fewer-permission-prompts`.
+
+## 8. Connectors (MCP servers) for the terminal
+
+`.mcp.json` in the repo root registers keyless, project-scoped servers. They load
+automatically when you start `claude` in this folder; approve them once when prompted.
+
+| Server | Purpose | Auth |
+|--------|---------|------|
+| context7 | Current React / Vite / Recharts docs while editing | Log in via `/mcp` on first use |
+| supabase | Persist signals, account and ML state | Log in via `/mcp` |
+| vercel | Deploy the Vite build, read build and runtime logs | Log in via `/mcp` |
+| notion | Trade journal and notes | Log in via `/mcp` |
+
+Market-data servers need an API key, so add them **locally** (kept out of git):
+
+```bash
+claude mcp add --transport http --scope local twelvedata  <URL from twelvedata.com/mcp>
+claude mcp add --transport http --scope local alphavantage <URL from alphavantage.co/mcp>
+claude mcp add --transport http --scope local cryptocom    <URL from crypto.com MCP docs>
+claude mcp add --transport http --scope local firecrawl    <URL from firecrawl.dev/mcp>
+```
+
+Check status any time with `claude mcp list` or `/mcp` inside a session. Remove one with
+`claude mcp remove <name>`. Never paste a key into `.mcp.json`.

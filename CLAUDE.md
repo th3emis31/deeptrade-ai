@@ -27,7 +27,8 @@ Single-page React 18 dashboard built with Vite. All app logic lives in one file:
 | `src/App.jsx` | Re-export shim → `src/src/App.jsx` (keeps the import path working; do not remove) |
 | `src/src/App.jsx` | The whole app (~2,800 lines): data model, ML brain, pages, API helpers |
 | `vite.config.js` | Vite + React plugin |
-| `package.json` | scripts: `dev`, `build`, `preview` |
+| `package.json` | scripts: `dev`, `build`, `preview`, `claude:install`, `claude:check` |
+| `.mcp.json` | Project MCP servers (context7, supabase, vercel, notion); keyless only |
 
 Dependencies: react, react-dom, recharts, lucide-react. Dev: vite, @vitejs/plugin-react.
 No test runner, no linter, no TypeScript. The build is the safety net.
