@@ -2523,23 +2523,6 @@ export default function App() {
   const [autoAnalysis,setAutoAnalysis]=useState(false);
   const [mlState,dispatch]=useReducer(mlReducer,INITIAL_ML);
   const [account,accountDispatch]=useReducer(accountReducer,ACCOUNT_INITIAL);
-
-  // ── Auto market alerts every 30 min ──────────────────────────────────
-  useEffect(()=>{
-    if(!authed) return;
-    const checkAlerts=()=>{
-      const mr=rateMarketDay(candles,mlState);
-      if(mr.rating==="AVOID"){
-        accountDispatch({type:"ADD_ALERT",alert:{type:"MARKET_ALERT",severity:"danger",msg:`${mr.emoji} Market conditions poor today (score: ${mr.score}/100). ${mr.reasons[0]||"Consider reducing position sizes or staying flat."}` }});
-        addNotif(`${mr.emoji} Poor trading conditions — check Alerts`,"error");
-      } else if(mr.rating==="CAUTION"){
-        accountDispatch({type:"ADD_ALERT",alert:{type:"MARKET_ALERT",severity:"warn",msg:`${mr.emoji} Market conditions mixed (score: ${mr.score}/100). Trade carefully. ${mr.reasons[0]||""}` }});
-      }
-    };
-    const t=setInterval(checkAlerts,1800000);
-    setTimeout(checkAlerts,3000); // Initial check after 3s
-    return()=>clearInterval(t);
-  },[authed,candles,mlState]);
   const [trainingLog,setTrainingLog]=useState([]);
   const [generating,setGenerating]=useState(false);
   const [genPlan,setGenPlan]=useState(false);
@@ -2572,6 +2555,23 @@ export default function App() {
     ASSETS.forEach(s=>{c[s]=genCandles(BASE_PRICES[s],80,ASSET_VOL[s]);});
     return c;
   });
+
+  // ── Auto market alerts every 30 min ──────────────────────────────────
+  useEffect(()=>{
+    if(!authed) return;
+    const checkAlerts=()=>{
+      const mr=rateMarketDay(candles,mlState);
+      if(mr.rating==="AVOID"){
+        accountDispatch({type:"ADD_ALERT",alert:{type:"MARKET_ALERT",severity:"danger",msg:`${mr.emoji} Market conditions poor today (score: ${mr.score}/100). ${mr.reasons[0]||"Consider reducing position sizes or staying flat."}` }});
+        addNotif(`${mr.emoji} Poor trading conditions — check Alerts`,"error");
+      } else if(mr.rating==="CAUTION"){
+        accountDispatch({type:"ADD_ALERT",alert:{type:"MARKET_ALERT",severity:"warn",msg:`${mr.emoji} Market conditions mixed (score: ${mr.score}/100). Trade carefully. ${mr.reasons[0]||""}` }});
+      }
+    };
+    const t=setInterval(checkAlerts,1800000);
+    setTimeout(checkAlerts,3000); // Initial check after 3s
+    return()=>clearInterval(t);
+  },[authed,candles,mlState]);
   const [signals,setSignals]=useState([
     {pair:"XAUUSD",grade:"A",dir:"BUY",entry:"5110",sl:"5060",tp1:"5160",tp2:"5200",tp3:"5240",conf:81,status:"ACTIVE",rr:"3.4",entryNum:5110,slNum:5060,tp1Num:5160,tp2Num:5200,tp3Num:5240,outcome:null},
     {pair:"BTCUSD",grade:"C",dir:"SELL",entry:"69500",sl:"71000",tp1:"67500",tp2:"66000",tp3:"64500",conf:85,status:"STOPPED",rr:"2.4",entryNum:69500,slNum:71000,tp1Num:67500,tp2Num:66000,tp3Num:64500,outcome:"LOSS"},
