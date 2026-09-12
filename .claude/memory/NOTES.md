@@ -17,3 +17,4 @@
 - 2026-09-12: Smoke-test recipe: `npm run build && npx vite preview --port 4173` then load
   the page headless and assert no pageerror/console errors (see /verify step 5).
 - 2026-09-12: Added .mcp.json with context7, supabase, vercel, notion (keyless HTTP servers). Market-data servers with keys stay local-scope.
+- 2026-09-12: Added claude-starter-kit/ — portable memory/hooks/skills/loop kit for any project (Python or Node), with install.ps1 and install.sh. Tested against a mock Python project.

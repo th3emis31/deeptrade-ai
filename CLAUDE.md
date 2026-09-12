@@ -29,6 +29,7 @@ Single-page React 18 dashboard built with Vite. All app logic lives in one file:
 | `vite.config.js` | Vite + React plugin |
 | `package.json` | scripts: `dev`, `build`, `preview`, `claude:install`, `claude:check` |
 | `.mcp.json` | Project MCP servers (context7, supabase, vercel, notion); keyless only |
+| `claude-starter-kit/` | Portable kit to install the same memory/hooks/skills/loop into any other project |
 
 Dependencies: react, react-dom, recharts, lucide-react. Dev: vite, @vitejs/plugin-react.
 No test runner, no linter, no TypeScript. The build is the safety net.

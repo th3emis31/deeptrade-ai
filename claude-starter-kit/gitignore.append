@@ -1,0 +1,10 @@
+.env
+.env.*
+.claude/backups/
+.claude/settings.local.json
+CLAUDE.local.md
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.DS_Store
