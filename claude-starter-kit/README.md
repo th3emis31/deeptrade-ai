@@ -7,7 +7,7 @@ installs, in the target project:
 |-------|--------------|
 | **Memory / brain / context** | `CLAUDE.md` (auto-loaded every session, with the owner's prime directive: always improve, always safe, never delete, zero errors), `.claude/memory/NOTES.md` (dated decisions), `.claude/memory/BACKLOG.md` (ideas) |
 | **Loop** | `/improve-loop` skill: one safe, verified, committed improvement per run; combine with `/loop 30m /improve-loop` |
-| **Skills** | `/safe-upgrade`, `/smart-entry` (10-rule entry checklist), `/verify`, `/brain`, `/dedupe`, `/backtest`, `/strategy`, `/train` |
+| **Skills** | `/safe-upgrade`, `/smart-entry` (10-rule entry checklist), `/verify`, `/brain`, `/dedupe`, `/backtest`, `/strategy`, `/train`, `/tv-plan` (TradingView drawing + paper trading cycle for `/loop`, needs `claude --chrome`) |
 | **Guardrails** | "Mistake prevention" and "Backtesting, strategy and training rules" sections in `CLAUDE.md`; a duplicate-definition hook that reports any newly added function already defined elsewhere; `.claude/memory/LESSONS.md` (shown every session) and `BASELINE.md` (comparable metrics per backtest/model) |
 | **Tools** | Hooks: backup before every edit, compile/build check after every edit (Python, Node, JSON auto-detected), memory shown at session start, uncommitted-work reminder on stop. Safe permission allow/deny list. Two subagents: `entry-reviewer`, `build-fixer`. `.mcp.json` with context7 only (docs, no credentials); add others per project with `claude mcp add` |
 
