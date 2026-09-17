@@ -103,3 +103,8 @@
   strategies/pine/volatility_trend_breakout_v2.pine (TP1 as a real limit order, leverage
   cap, optional session filter — all toggleable, v1 behaviour fully reproducible, nothing
   removed). Test order: limit TP1, then leverage cap, then 2013-2018, then BTCUSD.
+- 2026-09-17: Added docs/RUN_SYSTEM_BACKTEST.md — the paste-ready prompt for the local
+  session to run ml_trading_system's OWN backtest (existing entrypoint only, costs on,
+  OOS only, inverse baseline, append to BASELINE.md, no model writes, no tuning on test).
+  Point of the run: establish today's system baseline, which is the number the TradingView
+  breakout has to beat before porting is worth the work.
