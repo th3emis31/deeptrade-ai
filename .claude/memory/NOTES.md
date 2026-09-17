@@ -108,3 +108,22 @@
   OOS only, inverse baseline, append to BASELINE.md, no model writes, no tuning on test).
   Point of the run: establish today's system baseline, which is the number the TradingView
   breakout has to beat before porting is worth the work.
+- 2026-09-17: REPLICATION. Ported the Pine breakout to Python
+  (strategies/python/volatility_trend_breakout.py, stdlib only, Pine-exact ta.ema/ta.rma/
+  ta.rsi and the Pine broker emulator incl. stop-before-target and both TP1 fill models)
+  and ran it on Twelve Data XAU/USD, an independent feed. 4H 2023-01 → 2026-09:
+  213 legs / 136 positions, 72.30% wins, PF 1.750, +38.76%, max DD 5.26% — against
+  TradingView's 178 legs, 74.16%, PF 1.938, +40.69%, DD 5.50%. Two feeds, two engines,
+  same answer, so the result is not a TradingView artefact.
+  Inverse baseline: PF 0.571, −40.94%, DD 45.22%, longest losing streak 12 legs vs 4. Fails
+  hard, which is the pass condition.
+  My audit Finding 1 (TP1 filled at bar close) was measured and is IMMATERIAL: PF 1.926
+  limit vs 1.952 close. Recorded as a correction in the audit file.
+  Regime test, daily 2011-2019: PF 0.864, −3.72% over nine years, 58 legs. Outside an
+  uptrend it bleeds slowly rather than collapsing. Under 100 legs = insufficient evidence,
+  and daily bars are not the 4H strategy.
+  Engine was validated on a random walk first: PF ~0.96-1.0 and a small loss, i.e. no
+  accidental lookahead. Also fixed the R-multiple metric to normalise by the POSITION's
+  initial risk, since per-leg R overstated partial exits.
+  STILL NOT CLEARED: walk-forward with fixed folds, deflated Sharpe, a 4H bear-regime run,
+  the volume filter (Twelve Data has no volume for spot gold), live spread around releases.

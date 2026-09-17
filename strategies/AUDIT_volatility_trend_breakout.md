@@ -18,7 +18,13 @@ Source reviewed: Pine v5, the script behind the 2023-2026 row of 178 trades,
   ATR buffer. No forward reference.
 - **State is reset on each entry**, so no leakage between trades.
 
-## Finding 1 — TP1 is modelled at the bar close, not at TP1 (important)
+## Finding 1 — TP1 is modelled at the bar close, not at TP1 (MEASURED: immaterial)
+
+> **Update, same day.** The Python port measured both fill models on the same
+> data: profit factor 1.926 with a real limit order against 1.952 with the
+> market-at-close model, a difference of 1.3%. The concern below was correct in
+> principle and wrong in size. It is not carrying the result. See
+> `RESULTS_volatility_trend_breakout.md`.
 
 ```pine
 if not tp1Taken and high >= tp1Price
