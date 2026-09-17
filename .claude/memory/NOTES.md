@@ -150,3 +150,12 @@
   walk-forward runs with gate parameters fixed before each fold.
   Also fixed: max drawdown percent is now measured against peak equity, not starting
   capital, which was a fair criticism from the local run.
+- 2026-09-17: OWNER DECISION: trend dependence is accepted. The strategy is to be run in
+  the gold uptrend rather than filtered for all regimes, and the justification holds —
+  when the trend is absent the measured cost is -3.72% over nine years, or -0.65% with the
+  gate, so being wrong about the regime is cheap. Wrote strategies/DEPLOY_gold_breakout.md:
+  settings table, a concrete trend-off rule (daily close below EMA200 for three consecutive
+  days -> switch the regime gate ON rather than stop), expected-performance envelope for
+  drift detection (win rate 70-74%, PF 1.75-1.95, payoff 0.68, streak 3-4, DD 3-6%), four
+  kill switches, and the order of operations: demo forward test first, walk-forward in
+  parallel, compare after 20 trades.
