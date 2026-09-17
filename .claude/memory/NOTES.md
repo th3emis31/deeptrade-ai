@@ -46,3 +46,15 @@
   ml_trading_system\data\paper_trading when present, and starts the receiver.
   This cloud session cannot run anything on the Windows PC; the local Claude Code terminal
   session is what executes these steps.
+- 2026-09-17: INCIDENT (explained, not a breach): a TradingView paper position (1 @ 4280.43)
+  and a Sell Stop appeared "on their own" while the owner watched. Cause: the /tv-plan cycle,
+  step 4, which places a paper bracket order (entry + attached stop) whenever the plan is
+  VALID/READY. The layout change was the same cycle switching symbol and timeframe.
+  FIX (kit): /tv-plan is now DRAW-ONLY by default. It reads the plan, redraws the chart and
+  reports the order it WOULD place; it opens the Trading Panel only when the invocation says
+  "place" explicitly. Unattended loops therefore never create positions. The webhook log line
+  now carries mode: draw_only or placed.
+- 2026-09-17: SECRET ROTATION: the 48-char webhook secret generated on the Windows PC was
+  pasted into a chat transcript, so it is burned. Rotate with
+  run_paper_receiver.ps1 -NewSecret and update the Pine script settings. Risk was low
+  (receiver binds 127.0.0.1, records only) but a pasted secret is never reused.
