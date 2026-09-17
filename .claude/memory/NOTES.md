@@ -59,3 +59,11 @@
   pasted into a chat transcript, so it is burned. Rotate with
   run_paper_receiver.ps1 -NewSecret and update the Pine script settings. Risk was low
   (receiver binds 127.0.0.1, records only) but a pasted secret is never reused.
+- 2026-09-17: Added .claude/memory/BASELINE.md (from the kit) and recorded the three
+  TradingView tester rows. Volatility Trend Breakout (Gold), 2023-01-02 → 2026-09-17:
+  152 trades, 69.08% wins, PF 1.855, max DD 6.64%, +36.70% on 10K. Best candidate so far,
+  clearly ahead of Swing Trend Pullback v2 (PF 1.64, +5.07%) on return over drawdown
+  (5.5 vs 2.4). Derived from PF and win rate: avg win / avg loss = 0.83, so the payoff is
+  many small wins against fewer larger losses — check the worst single loss before trusting it.
+  Still unverified: broker costs, position sizing, request.security repaint, inverse baseline,
+  and any period outside the 2023-2026 gold bull run.
