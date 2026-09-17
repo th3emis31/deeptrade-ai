@@ -56,6 +56,14 @@ class Config:
     tp1_r: float = 1.3
     tp2_r: float = 2.8
 
+    # Regime gate (off by default: the defaults must stay the Pine script's defaults)
+    use_regime: bool = False
+    regime_ema_len: int = 200
+    adx_len: int = 14
+    adx_min: float = 20.0
+    regime_daily: bool = False      # measure the regime on DAILY bars, not the chart timeframe
+    regime_daily_ema_len: int = 50
+
     use_trail: bool = True
     trail_atr: float = 2.2
     use_time_exit: bool = True
@@ -198,6 +206,35 @@ def rsi(values: Sequence[float], length: int) -> List[Optional[float]]:
     return out
 
 
+def adx(candles: Sequence[Candle], length: int) -> List[Optional[float]]:
+    """Wilder's ADX, matching Pine's ta.dmi divisor (RMA of true range)."""
+    plus_dm = [0.0] * len(candles)
+    minus_dm = [0.0] * len(candles)
+    for i in range(1, len(candles)):
+        up = candles[i].high - candles[i - 1].high
+        dn = candles[i - 1].low - candles[i].low
+        plus_dm[i] = up if (up > dn and up > 0) else 0.0
+        minus_dm[i] = dn if (dn > up and dn > 0) else 0.0
+    tr_rma = rma(true_range(candles), length)
+    p_rma = rma(plus_dm, length)
+    m_rma = rma(minus_dm, length)
+    dx: List[float] = [0.0] * len(candles)
+    valid = [False] * len(candles)
+    for i in range(len(candles)):
+        if tr_rma[i] is None or p_rma[i] is None or m_rma[i] is None or tr_rma[i] == 0:
+            continue
+        pdi = 100.0 * p_rma[i] / tr_rma[i]
+        mdi = 100.0 * m_rma[i] / tr_rma[i]
+        total = pdi + mdi
+        dx[i] = 100.0 * abs(pdi - mdi) / total if total > 0 else 0.0
+        valid[i] = True
+    first = next((i for i, v in enumerate(valid) if v), None)
+    if first is None:
+        return [None] * len(candles)
+    tail = rma(dx[first:], length)
+    return [None] * first + list(tail)
+
+
 def rolling_max(values: Sequence[float], length: int) -> List[Optional[float]]:
     out: List[Optional[float]] = [None] * len(values)
     for i in range(len(values)):
@@ -212,6 +249,31 @@ def rolling_min(values: Sequence[float], length: int) -> List[Optional[float]]:
         if i >= length - 1:
             out[i] = min(values[i - length + 1:i + 1])
     return out
+
+
+def to_daily(candles: Sequence[Candle]) -> tuple:
+    """Aggregate intraday candles into daily ones.
+
+    Returns (daily_candles, index_map) where index_map[i] is the position of the last
+    FULLY CLOSED daily bar as of intraday bar i. A bar never sees its own day, so the
+    regime value carries no lookahead.
+    """
+    days: List[Candle] = []
+    day_of: List[int] = []
+    cur_key = None
+    for c in candles:
+        key = c.ts.split(" ")[0].split("T")[0]
+        if key != cur_key:
+            days.append(Candle(key, c.open, c.high, c.low, c.close, c.volume))
+            cur_key = key
+        else:
+            d = days[-1]
+            d.high = max(d.high, c.high)
+            d.low = min(d.low, c.low)
+            d.close = c.close
+            d.volume += c.volume
+        day_of.append(len(days) - 2)      # the previous day, i.e. the last closed one
+    return days, day_of
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +304,18 @@ def generate_signals(candles: Sequence[Candle], cfg: Config = Config()) -> List[
     vols = [c.volume for c in candles]
 
     ema_v = ema(closes, cfg.ema_len)
+    regime_ema_v = ema(closes, cfg.regime_ema_len) if cfg.use_regime else [None] * len(closes)
+    adx_v = adx(candles, cfg.adx_len) if cfg.use_regime else [None] * len(closes)
+
+    d_ema_v: List[Optional[float]] = []
+    d_adx_v: List[Optional[float]] = []
+    day_of: List[int] = []
+    d_closes: List[float] = []
+    if cfg.use_regime and cfg.regime_daily:
+        dailies, day_of = to_daily(candles)
+        d_closes = [d.close for d in dailies]
+        d_ema_v = ema(d_closes, cfg.regime_daily_ema_len)
+        d_adx_v = adx(dailies, cfg.adx_len)
     atr_v = atr(candles, cfg.atr_len)
     rsi_v = rsi(closes, cfg.rsi_len)
     vma_v = sma(vols, cfg.vol_ma_len)
@@ -263,7 +337,24 @@ def generate_signals(candles: Sequence[Candle], cfg: Config = Config()) -> List[
         rsi_ok = (not cfg.use_rsi) or (r is not None and r > cfg.rsi_min)
         vol_ok = (not cfg.use_volume) or (vma_v[i] is not None and c.volume > vma_v[i])
 
-        if not (breakout and trend_ok and rsi_ok and vol_ok):
+        # A trend-following breakout only has an edge while a trend exists. Outside one
+        # it pays fees, which is what 2012-2018 shows.
+        regime_ok = True
+        if cfg.use_regime and cfg.regime_daily:
+            d = day_of[i]
+            if d < 0 or d >= len(d_ema_v):
+                regime_ok = False
+            else:
+                slow, adx_now = d_ema_v[d], d_adx_v[d]
+                regime_ok = (slow is not None and d_closes[d] > slow
+                             and adx_now is not None and adx_now >= cfg.adx_min)
+        elif cfg.use_regime:
+            slow = regime_ema_v[i]
+            adx_now = adx_v[i]
+            regime_ok = (slow is not None and c.close > slow
+                         and adx_now is not None and adx_now >= cfg.adx_min)
+
+        if not (breakout and trend_ok and rsi_ok and vol_ok and regime_ok):
             continue
 
         risk_dist = cfg.sl_atr_mult * a
@@ -455,9 +546,15 @@ def metrics(res: Result, cfg: Config) -> dict:
 
     peak = cfg.initial_capital
     max_dd = 0.0
+    max_dd_pct = 0.0
     for e in res.equity_curve:
         peak = max(peak, e)
-        max_dd = max(max_dd, peak - e)
+        dd = peak - e
+        if dd > max_dd:
+            max_dd = dd
+        # Percent is measured against the peak that preceded it, not starting capital.
+        if peak > 0 and dd / peak > max_dd_pct:
+            max_dd_pct = dd / peak
 
     streak = worst_streak = 0
     for l in legs:
@@ -479,7 +576,7 @@ def metrics(res: Result, cfg: Config) -> dict:
         "avg_loss": gross_loss / len(losses) if losses else 0.0,
         "expectancy_r_per_position": sum(l.r_multiple for l in legs) / res.positions if res.positions else 0.0,
         "max_dd_usd": max_dd,
-        "max_dd_pct": 100.0 * max_dd / cfg.initial_capital,
+        "max_dd_pct": 100.0 * max_dd_pct,
         "longest_losing_streak": worst_streak,
         "size_capped_entries": res.capped_entries,
     }
@@ -495,7 +592,7 @@ def format_report(m: dict, label: str) -> str:
         ("net", "%.2f USD  (%.2f %%)" % (m["net_usd"], m["net_pct"])),
         ("average win / loss", "%.2f / %.2f" % (m["avg_win"], m["avg_loss"])),
         ("expectancy per position", "%.3f R" % m["expectancy_r_per_position"]),
-        ("max drawdown", "%.2f USD  (%.2f %%)" % (m["max_dd_usd"], m["max_dd_pct"])),
+        ("max drawdown", "%.2f USD  (%.2f %% of peak equity)" % (m["max_dd_usd"], m["max_dd_pct"])),
         ("longest losing streak", "%d legs" % m["longest_losing_streak"]),
         ("entries capped by leverage", "%d" % m["size_capped_entries"]),
     ]
@@ -518,6 +615,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help="limit = realistic resting order, close = Pine v1 market-at-close")
     ap.add_argument("--no-volume-filter", action="store_true",
                     help="the Pine volume filter uses broker tick volume and does not port cleanly")
+    ap.add_argument("--regime-filter", action="store_true",
+                    help="only trade while price is above the slow EMA and ADX is above the threshold")
+    ap.add_argument("--regime-ema", type=int, default=200)
+    ap.add_argument("--regime-daily", action="store_true",
+                    help="measure the regime on the last CLOSED daily bar instead of the chart timeframe")
+    ap.add_argument("--regime-daily-ema", type=int, default=50)
+    ap.add_argument("--adx-min", type=float, default=20.0)
     ap.add_argument("--inverse", action="store_true", help="run the opposite-direction baseline")
     ap.add_argument("--both", action="store_true", help="run the strategy and its inverse baseline")
     args = ap.parse_args(argv)
@@ -532,11 +636,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                       commission_pct=args.commission, slippage_ticks=args.slippage_ticks,
                       mintick=args.mintick, max_leverage=args.max_leverage,
                       tp1_model=args.tp1_model, inverse=inverse,
-                      use_volume=not args.no_volume_filter)
+                      use_volume=not args.no_volume_filter,
+                      use_regime=args.regime_filter or args.regime_daily,
+                      regime_ema_len=args.regime_ema, adx_min=args.adx_min,
+                      regime_daily=args.regime_daily,
+                      regime_daily_ema_len=args.regime_daily_ema)
 
-    print("bars: %d   %s -> %s   timeframe: %s   TP1 fill: %s   leverage cap: %s"
+    print("bars: %d   %s -> %s   timeframe: %s   TP1 fill: %s   leverage cap: %s   regime gate: %s"
           % (len(candles), candles[0].ts, candles[-1].ts, args.tf, args.tp1_model,
-             ("%.1fx" % args.max_leverage) if args.max_leverage > 0 else "none"))
+             ("%.1fx" % args.max_leverage) if args.max_leverage > 0 else "none",
+             ("DAILY EMA%d + ADX>=%.0f" % (args.regime_daily_ema, args.adx_min)) if args.regime_daily
+             else ("EMA%d + ADX>=%.0f" % (args.regime_ema, args.adx_min)) if args.regime_filter else "off"))
     print()
 
     runs = [(False, "STRATEGY")] if not args.inverse else [(True, "INVERSE BASELINE")]

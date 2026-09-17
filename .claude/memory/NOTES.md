@@ -133,3 +133,20 @@
   (TP1 at bar close, no cap): 213 legs, 71.83% wins, PF 1.763, +39.65%, DD 6.34% — within
   1% of the v2 configuration. Raising risk 0.85% → 1.0% scales the result linearly
   (+47.85%, DD 7.91%), confirming the sizing path is correct.
+- 2026-09-17: VERDICT on the breakout. The local 19-year Vantage run (PF 0.990 for
+  2007-2022 vs 1.986 for 2023-2026) looked like overfitting. It is not. Daily XAU/USD
+  2004-2012, covering the 2008-2011 bull and never tuned on, reproduces the fingerprint:
+  104 legs, 73.08% wins, PF 1.888, +22.77%, DD 3.19% of peak, inverse PF 0.559.
+  A curve-fitted rule set does not reproduce itself in another decade's bull market.
+  Conclusion: TREND-DEPENDENT, not curve-fitted. It earns in gold uptrends and pays fees
+  otherwise, which is the honest shape of a long-only breakout.
+  Regime gate experiments (added to the port as --regime-filter / --regime-daily, both OFF
+  by default so the Pine defaults stay intact): on daily 2004-2019 the chart gate
+  (EMA200 + ADX>=20) gives the same net for half the drawdown (PF 1.376 -> 1.556,
+  DD 10.78% -> 5.33%) and turns the bad years from -3.72% into -0.65%. On 4H 2023-2026 it
+  COSTS profit (+16.53% vs +38.76%); the daily gate is better there (PF 1.766, +22.03%) but
+  still removes 43% of trades. SELECTION BIAS WARNING recorded in the results file: three
+  gate configs were tried on data already seen, so none of this is validated until the
+  walk-forward runs with gate parameters fixed before each fold.
+  Also fixed: max drawdown percent is now measured against peak equity, not starting
+  capital, which was a fair criticism from the local run.
