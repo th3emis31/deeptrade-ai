@@ -38,3 +38,11 @@
   daily cap, JSON ledger, dry_run always true, no broker client in the file),
   (3) Claude in Chrome clicking the paper panel = review only, (4) Alpaca has no gold.
   gold_router_v1.pine now emits a JSON alert() payload per entry for path 2.
+- 2026-09-17: Windows note: bash syntax (export, python3, ./script.sh) fails in cmd.exe.
+  On this machine use PowerShell, `py -3` or `python` (python3 is the Microsoft Store stub),
+  and $env:VAR instead of export. Added scripts/run_paper_receiver.ps1 which finds Python
+  (venv first, then py -3, then python), generates and remembers a 48-char secret in
+  %USERPROFILE%\.paper_webhook_secret (never in git), points the ledger at
+  ml_trading_system\data\paper_trading when present, and starts the receiver.
+  This cloud session cannot run anything on the Windows PC; the local Claude Code terminal
+  session is what executes these steps.
