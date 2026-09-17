@@ -86,3 +86,20 @@
   for 20+ trades and compare win rate against the backtest. Decision: if the breakout
   clears the gates it REPLACES the 21/50 pullback as the router's trend engine, with the
   pullback kept behind its own toggle. Family C stays the range engine.
+- 2026-09-17: AUDIT of Volatility Trend Breakout (Better Exits), Pine v5 source read.
+  PASSES: no request.security anywhere so no repaint; commission 0.04%/side and slippage 2
+  are set, so +40.69% is already after costs; sizing is genuine risk sizing (explicit qty
+  from 0.85% equity / stop distance, overriding the percent_of_equity header); entry uses
+  close > upper[1] + 0.35 ATR, closed-bar only.
+  FINDING 1 (material): TP1 used strategy.close, a MARKET order, and with
+  process_orders_on_close=true it fills at the BAR'S CLOSE rather than at tp1Price.
+  Breakout bars that reach TP1 tend to close near their high, so modelled fills beat live
+  ones. Part of the 74% win rate may be this.
+  FINDING 2: no margin_long, so the tester allowed unlimited leverage; risk sizing in a
+  low-ATR stretch asks for 2-5x equity.
+  FINDING 3: long only inside the 2023-2026 gold bull run, untested elsewhere.
+  FINDING 4: the volume filter uses broker tick volume, so it will not reproduce in Python.
+  Wrote strategies/AUDIT_volatility_trend_breakout.md and
+  strategies/pine/volatility_trend_breakout_v2.pine (TP1 as a real limit order, leverage
+  cap, optional session filter — all toggleable, v1 behaviour fully reproducible, nothing
+  removed). Test order: limit TP1, then leverage cap, then 2013-2018, then BTCUSD.
