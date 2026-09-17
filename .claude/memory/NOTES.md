@@ -77,3 +77,12 @@
   on the win rate holding. RISK TO CHECK: tighter take-profits mean more bars where both the
   stop and the target sit inside the same bar, and without Bar Magnifier (paid plans only)
   TradingView assumes the intrabar order. The better the exits look, the more this matters.
+- 2026-09-17: Added strategies/PORTING_TO_SYSTEM.md — the path for taking a TradingView
+  strategy into ml_trading_system: audit the Pine source first (repaint, costs, sizing,
+  intrabar exits, fitted thresholds), port into one pure function behind predict_signal,
+  reproduce the TradingView trade count, pass the Strategy Lab gates (100+ OOS trades,
+  PF > 1.3 after costs, inverse baseline worse, deflated Sharpe >= 0.95, leak-free
+  walk-forward, one run outside 2023-2026), then demo forward test on the Vantage MT5 demo
+  for 20+ trades and compare win rate against the backtest. Decision: if the breakout
+  clears the gates it REPLACES the 21/50 pullback as the router's trend engine, with the
+  pullback kept behind its own toggle. Family C stays the range engine.
