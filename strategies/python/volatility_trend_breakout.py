@@ -407,7 +407,8 @@ def _round_tick(price: float, mintick: float) -> float:
     return round(price / mintick) * mintick if mintick > 0 else price
 
 
-def backtest(candles: Sequence[Candle], cfg: Config = Config()) -> Result:
+def backtest(candles: Sequence[Candle], cfg: Config = Config(),
+             signals: Optional[Sequence[Signal]] = None) -> Result:
     """Event-driven simulation.
 
     Fill rules, matching the Pine emulator:
@@ -416,8 +417,8 @@ def backtest(candles: Sequence[Candle], cfg: Config = Config()) -> Result:
       * When a bar contains both the stop and a target, the stop is taken first.
       * Stop and market fills pay slippage; limit fills do not.
     """
-    signals = generate_signals(candles, cfg)
-    by_index = {s.index: s for s in signals}
+    sigs = list(signals) if signals is not None else generate_signals(candles, cfg)
+    by_index = {s.index: s for s in sigs}
 
     res = Result()
     equity = cfg.initial_capital

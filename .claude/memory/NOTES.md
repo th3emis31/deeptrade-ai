@@ -159,3 +159,14 @@
   drift detection (win rate 70-74%, PF 1.75-1.95, payoff 0.68, streak 3-4, DD 3-6%), four
   kill switches, and the order of operations: demo forward test first, walk-forward in
   parallel, compare after 20 trades.
+- 2026-09-17: FVG and CRT measured on the same engine, data and costs as the breakout.
+  BOTH ARE PROFITABLE and both inverses fail hard, so neither is noise.
+  4H 2023-2026: FVG PF 1.225 (+12.12%), CRT PF 1.218 (+7.53%), breakout PF 1.750 (+38.76%).
+  DAILY 2004-2019 (bull + bear + chop): FVG PF 1.390 (+27.22%, DD 9.81%, 227 legs) BEATS
+  the breakout (PF 1.376, +15.75%, DD 10.78%, 147 legs); CRT PF 1.207 (+12.67%).
+  KEY FINDING: the breakout only earns in uptrends, FVG earned across all three regimes.
+  That argues for running them together — FVG as the all-weather base, the breakout as the
+  trend accelerator — rather than choosing one. Contradicts my earlier assumption that the
+  breakout should simply be the primary strategy.
+  Process note: my first FVG implementation returned zero trades because a zone was dropped
+  on the bar that created it. Bug found and fixed before the numbers above were produced.
