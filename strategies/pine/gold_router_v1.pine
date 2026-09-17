@@ -51,6 +51,7 @@ G_REG   = "④ Regime and daily bias"
 G_RISK  = "⑤ Risk and sizing"
 G_GUARD = "⑥ Guards"
 G_HTF   = "⑦ Higher timeframe handling"
+G_WEB   = "⑧ Webhook (paper execution)"
 
 // ============================================================================
 // SECTION 1 — ROUTER INPUTS
@@ -136,6 +137,13 @@ volMult = input.float(3.0, "Breaker multiple", minval=1.0, step=0.1, group=G_GUA
 useClosedHtf = input.bool(true, "Use last CLOSED higher timeframe bar (no repaint)", group=G_HTF,
      tooltip="ON: history and realtime see the same values. OFF: uses the developing higher timeframe bar, which repaints and flatters every backtest.")
 
+useWebhook = input.bool(true, "Emit a JSON webhook payload on every entry", group=G_WEB,
+     tooltip="The alert() message becomes machine-readable JSON so a paper-trading receiver can place the order. Needs a TradingView plan with webhooks; on Free the alert still fires, it just cannot POST anywhere.")
+webhookSecret = input.string("SET-ME", "Shared secret", group=G_WEB,
+     tooltip="The receiver rejects any payload whose secret does not match. Set it in the script settings, not in the saved script, and never publish the script with a real value in it.")
+webhookMode = input.string("paper", "Execution mode sent to the receiver", options=["paper", "demo"], group=G_WEB,
+     tooltip="The receiver must refuse anything that is not paper or demo. This field is the last line of defence, not the first.")
+
 // ============================================================================
 // SECTION 7 — TIMEFRAME GUARDS
 // ============================================================================
@@ -205,6 +213,14 @@ f_qty(_stopDist) =>
     _perUnit = _stopDist * syminfo.pointvalue
     _sized = _perUnit > 0 ? _riskCash / _perUnit : 0.0
     useRiskSizing ? _sized : fixedQty
+
+// One flat JSON object per entry, consumed by the paper-trading receiver.
+f_payload(_engine, _action, _entry, _stop, _target, _qty) =>
+    '{"secret":"' + webhookSecret + '","mode":"' + webhookMode + '","engine":"' + _engine +
+     '","action":"' + _action + '","symbol":"' + syminfo.ticker + '","tf":"' + timeframe.period +
+     '","price":' + str.tostring(_entry, format.mintick) + ',"stop":' + str.tostring(_stop, format.mintick) +
+     ',"target":' + str.tostring(_target, format.mintick) + ',"qty":' + str.tostring(_qty, "#.####") +
+     ',"risk_pct":' + str.tostring(riskPct, "#.##") + ',"bar_time":' + str.tostring(time) + '}'
 
 // ============================================================================
 // SECTION 9 — HIGHER TIMEFRAME AND CHART FEATURES
@@ -319,18 +335,24 @@ if takeALong
     pendRR := pbRR
     pendEngine := "A"
     strategy.entry("A Long", strategy.long, qty=f_qty(pendStop))
+    if useWebhook
+        alert(f_payload("A", "buy", close, close - pendStop, close + pendStop * pbRR, f_qty(pendStop)), alert.freq_once_per_bar_close)
 
 if takeAShort
     pendStop := aAtr * pbStopATR
     pendRR := pbRR
     pendEngine := "A"
     strategy.entry("A Short", strategy.short, qty=f_qty(pendStop))
+    if useWebhook
+        alert(f_payload("A", "sell", close, close + pendStop, close - pendStop * pbRR, f_qty(pendStop)), alert.freq_once_per_bar_close)
 
 if takeBShort
     pendStop := atr5 * mrStopATR
     pendRR := mrRR
     pendEngine := "B"
     strategy.entry("B Short", strategy.short, qty=f_qty(pendStop))
+    if useWebhook
+        alert(f_payload("B", "sell", close, close + pendStop, close - pendStop * mrRR, f_qty(pendStop)), alert.freq_once_per_bar_close)
 
 openedLong = strategy.position_size > 0 and strategy.position_size[1] <= 0
 openedShort = strategy.position_size < 0 and strategy.position_size[1] >= 0

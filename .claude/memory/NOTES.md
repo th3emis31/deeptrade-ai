@@ -29,3 +29,12 @@
   risk sizing. Decision rule recorded: the combination is only kept if it beats the
   better single engine on profit factor AND drawdown. Gold session pullback is NOT
   combinable (same family as Engine A, correlated losses); ML model only as a veto.
+- 2026-09-17: TradingView execution research: TradingView's own Paper Trading has NO API
+  and Pine strategies never auto-execute into it; webhook alerts need the Essential plan
+  and POST outward only. Ranked path recorded in docs/TRADINGVIEW_AUTOMATION.md:
+  (1) Vantage MT5 demo via the existing bridge = best automated paper fills,
+  (2) Essential + webhook -> scripts/paper_webhook_receiver.py (stdlib http.server,
+  secret check, paper/demo modes only, stop-side geometry check, qty cap, per-bar dedupe,
+  daily cap, JSON ledger, dry_run always true, no broker client in the file),
+  (3) Claude in Chrome clicking the paper panel = review only, (4) Alpaca has no gold.
+  gold_router_v1.pine now emits a JSON alert() payload per entry for path 2.
