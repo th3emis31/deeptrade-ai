@@ -46,11 +46,12 @@
   ml_trading_system\data\paper_trading when present, and starts the receiver.
   This cloud session cannot run anything on the Windows PC; the local Claude Code terminal
   session is what executes these steps.
-- 2026-09-17: INCIDENT (explained, not a breach): a TradingView paper position (1 @ 4280.43)
-  and a Sell Stop appeared "on their own" while the owner watched. Cause: the /tv-plan cycle,
-  step 4, which places a paper bracket order (entry + attached stop) whenever the plan is
-  VALID/READY. The layout change was the same cycle switching symbol and timeframe.
-  FIX (kit): /tv-plan is now DRAW-ONLY by default. It reads the plan, redraws the chart and
+- 2026-09-17: CORRECTION — no incident. The TradingView paper position (1 @ 4280.43) and the
+  Sell Stop were placed by the owner, not by automation. My first diagnosis blamed the
+  /tv-plan cycle and was wrong; do not repeat it. Lesson: when a position appears
+  unexplained, ask who placed it and check the paper order history timestamp against the
+  schedule BEFORE naming a cause.
+  KEPT ANYWAY (not a fix, a default): /tv-plan is now DRAW-ONLY by default. It reads the plan, redraws the chart and
   reports the order it WOULD place; it opens the Trading Panel only when the invocation says
   "place" explicitly. Unattended loops therefore never create positions. The webhook log line
   now carries mode: draw_only or placed.
