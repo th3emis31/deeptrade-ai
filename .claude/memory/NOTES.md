@@ -170,3 +170,16 @@
   breakout should simply be the primary strategy.
   Process note: my first FVG implementation returned zero trades because a zone was dropped
   on the bar that created it. Bug found and fixed before the numbers above were produced.
+- 2026-09-17: PORTFOLIO TEST (strategies/python/portfolio_backtest.py, one account, one
+  position, earliest signal wins). DAILY 2004-2019: Breakout+FVG = PF 1.393, +32.36%,
+  DD 8.98% — beats FVG alone (1.390, +27.22%, 9.81%) and breakout alone (1.376, +15.75%,
+  10.78%) on profit AND drawdown together. Adding CRT dilutes it (1.276, +26.70%, 10.62%).
+  4H 2023-2026 (strong trend): breakout ALONE wins (1.750, +38.76%, DD 5.06%); adding FVG
+  drops it to 1.317/+24.99%, adding CRT to 1.138/+1.23%.
+  DECISION: the pair is Breakout + FVG. CRT is not additive and comes out of the portfolio.
+  In a confirmed strong trend, run the breakout alone — that is the regime switch in
+  DEPLOY_gold_breakout.md doing its job.
+  STOP RULE RECORDED: this is about the twentieth configuration measured on the same gold
+  history. Further variants on this data raise selection bias without adding information.
+  The only next steps that add information are walk-forward with fixed folds, a different
+  instrument, and live demo fills.

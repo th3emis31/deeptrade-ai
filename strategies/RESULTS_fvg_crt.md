@@ -62,3 +62,51 @@ the breakout as the trend accelerator.
   argue against that being the whole story, but it is still part of it.
 - No walk-forward, no live spread, no demo trades. Same caveats as everything else
   in this repository.
+
+---
+
+# Combined: does running them together win?
+
+One account, one position at a time, earliest signal wins, same costs and risk.
+
+## 4H gold 2023-2026 (a strong uptrend)
+
+| | Legs | Win rate | Profit factor | Net | Max drawdown |
+|---|---|---|---|---|---|
+| **Breakout alone** | 213 | 72.30% | **1.750** | **+38.76%** | **5.06%** |
+| Breakout + FVG | 363 | 66.12% | 1.317 | +24.99% | 8.12% |
+| Breakout + FVG + CRT | 499 | 64.53% | 1.138 | +1.23% | 14.60% |
+
+In a strong trend, adding anything to the breakout makes it worse. The extra
+trades occupy the account and block the better ones.
+
+## Daily gold 2004-2019 (bull, bear and chop)
+
+| | Legs | Win rate | Profit factor | Net | Max drawdown |
+|---|---|---|---|---|---|
+| **Breakout + FVG** | 260 | 66.54% | **1.393** | **+32.36%** | **8.98%** |
+| FVG alone | 227 | 66.52% | 1.390 | +27.22% | 9.81% |
+| Breakout alone | 147 | 67.35% | 1.376 | +15.75% | 10.78% |
+| Breakout + FVG + CRT | 322 | 65.22% | 1.276 | +26.70% | 10.62% |
+
+Across mixed regimes the pair beats either component on profit and on drawdown
+at once, which is the only combination result worth having. The two do not fire
+at the same time: the breakout takes the trending stretches and the fair value
+gaps take the rest.
+
+## Conclusions
+
+1. **Breakout + FVG is the pair.** More profit and less drawdown than either
+   alone across sixteen years of mixed conditions.
+2. **CRT comes out.** It dilutes both portfolios. It is mildly profitable alone
+   and it is not additive, which is the thing that matters in a portfolio.
+3. **In a confirmed strong trend, the breakout alone is better.** That is an
+   argument for the regime switch in the deployment sheet, not against the pair.
+
+## The limit of what more backtesting can tell us
+
+This is roughly the twentieth configuration measured on the same gold history.
+Each new one raises the chance that the best row is the luckiest row rather than
+the best strategy. Nothing further should be decided by trying another variant on
+this data. The remaining questions need new information: walk-forward with
+parameters fixed before each fold, a different instrument, or live demo fills.
