@@ -1,0 +1,463 @@
+//@version=6
+// ============================================================================
+// Gold Router v1 — Trend Pullback (Engine A) + Family C Mean Reversion (Engine B)
+// ----------------------------------------------------------------------------
+// Purpose: run two strategies that already exist as ONE account-level system,
+//          so they never fight each other and never double the risk.
+//
+//   Engine A — Trend Pullback. 21/50 EMA pullback on a higher timeframe
+//              (default 60 min, also valid on 240 / D). Long and short.
+//              This is the "Swing Trend Pullback" family.
+//   Engine B — Family C Mean Reversion SHORT. 5M fade of an accelerating
+//              up-move while 30M volatility is compressed. Short only.
+//
+//   Router   — one position at a time. A daily-bias filter and an ADX regime
+//              filter decide which engine is allowed to speak:
+//                trending market  -> Engine A only
+//                range / quiet    -> Engine B only (and only with the daily bias)
+//              Engine A always has priority; Engine B is muted for N bars after
+//              any Engine A signal.
+//
+//   Shared guards (apply to BOTH engines):
+//     • session window            • news blackout window
+//     • volatility circuit breaker (ATR vs its own average)
+//     • max trades per day        • daily loss kill switch
+//     • percent-of-equity risk sizing from the actual stop distance
+//     • optional move to breakeven at +1R
+//
+// How to use: apply to the 5-minute chart of XAUUSD. Engine A is pulled from
+// the higher timeframe with closed bars only, so it does not repaint; Engine B
+// needs 5M bars to exist. On any other chart timeframe Engine B mutes itself.
+//
+// Honesty note: every default here is a starting point, not a validated edge.
+// Nothing in this file has been forward-tested. Read the notes in section 16 first.
+// ============================================================================
+
+strategy("Gold Router v1 — Trend Pullback + Family C", overlay=true, pyramiding=0,
+     process_orders_on_close=false, calc_on_order_fills=true,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     commission_type=strategy.commission.percent, commission_value=0.005,
+     slippage=3, initial_capital=10000, currency=currency.USD,
+     max_labels_count=500)
+
+// ============================================================================
+// SECTION 0 — GROUPS
+// ============================================================================
+
+G_ROUTE = "① Router"
+G_A     = "② Engine A — trend pullback"
+G_B     = "③ Engine B — Family C mean reversion short"
+G_REG   = "④ Regime and daily bias"
+G_RISK  = "⑤ Risk and sizing"
+G_GUARD = "⑥ Guards"
+G_HTF   = "⑦ Higher timeframe handling"
+
+// ============================================================================
+// SECTION 1 — ROUTER INPUTS
+// ============================================================================
+
+engineAOn = input.bool(true, "Engine A enabled (trend pullback)", group=G_ROUTE,
+     tooltip="Turn off to backtest Engine B alone and compare it against the combined row.")
+engineBOn = input.bool(true, "Engine B enabled (Family C short)", group=G_ROUTE,
+     tooltip="Turn off to backtest Engine A alone. Running each engine alone and then together is how you find out whether the combination actually helps.")
+blockBars = input.int(24, "Mute Engine B for N bars after an Engine A signal", minval=0, group=G_ROUTE,
+     tooltip="Stops the mean-reversion short from firing into a fresh trend setup. 24 bars = 2 hours on a 5M chart.")
+allowBAgainstDailyUp = input.bool(false, "Allow Engine B shorts while the daily bias is up", group=G_ROUTE,
+     tooltip="OFF (default): Family C only shorts when the daily close is below its EMA. ON: reproduces the standalone Family C behaviour, which shorts into daily uptrends.")
+
+// ============================================================================
+// SECTION 2 — ENGINE A INPUTS
+// ============================================================================
+
+pbTf = input.timeframe("60", "Engine A timeframe", group=G_A,
+     tooltip="Timeframe the pullback is measured on. 60 = H1, 240 = H4, D = daily. Must be higher than the chart timeframe.")
+pbFast = input.int(21, "Fast EMA", minval=1, group=G_A, tooltip="The pullback reference. Price must tag it and close back on the trend side.")
+pbSlow = input.int(50, "Slow EMA", minval=1, group=G_A, tooltip="The trend reference. Fast above slow = uptrend.")
+pbSlopeLb = input.int(3, "Slow EMA slope lookback", minval=1, group=G_A, tooltip="Bars used to check that the slow EMA is actually moving in the trend direction.")
+requireSlope = input.bool(true, "Require slow EMA slope to agree", group=G_A, tooltip="Removes pullback entries in a flat 21/50 cross zone, which is where this family loses most.")
+pbAtrLen = input.int(14, "ATR length", minval=1, group=G_A, tooltip="ATR on the Engine A timeframe, used for its stop distance.")
+pbStopATR = input.float(1.50, "Stop ATR multiple", minval=0.1, step=0.05, group=G_A, tooltip="Stop distance = Engine A ATR x this.")
+pbRR = input.float(2.00, "Risk reward", minval=0.1, step=0.25, group=G_A, tooltip="Target distance = stop distance x this.")
+pbMaxBars = input.int(576, "Max chart bars in an Engine A trade", minval=1, group=G_A, tooltip="576 x 5M = 48 hours. The trade is closed at market after this.")
+aRequireTrendRegime = input.bool(true, "Engine A only in a trending regime", group=G_A, tooltip="Uses the ADX filter in section 4. A trend strategy taken in a dead range is the most common way this family bleeds.")
+
+// ============================================================================
+// SECTION 3 — ENGINE B INPUTS (Family C)
+// ============================================================================
+
+rsiLength = input.int(14, "RSI length (5M)", minval=1, group=G_B, tooltip="RSI period on the chart timeframe.")
+emaFast = input.int(9, "EMA fast (5M / 15M spread)", minval=1, group=G_B, tooltip="Fast EMA of the spread feature.")
+emaSlow = input.int(21, "EMA slow (5M / 15M spread)", minval=1, group=G_B, tooltip="Slow EMA of the spread feature.")
+atrLength = input.int(14, "ATR length (5M)", minval=1, group=G_B, tooltip="ATR on the chart timeframe, used for the Engine B stop.")
+mrStopATR = input.float(1.50, "Stop ATR multiple", minval=0.1, step=0.05, group=G_B, tooltip="Stop distance = 5M ATR x this.")
+mrRR = input.float(2.00, "Risk reward", minval=0.1, step=0.25, group=G_B, tooltip="Target distance = stop distance x this.")
+mrMaxBars = input.int(144, "Max chart bars in an Engine B trade", minval=1, group=G_B, tooltip="144 x 5M = 12 hours.")
+ema15ChangeThreshold = input.float(0.016396, "15M EMA spread change threshold", step=0.000001, group=G_B, tooltip="Discovery value. Six decimals means it was fitted to one dataset; treat it as a starting point, not a law.")
+vol30Threshold = input.float(0.001277, "30M volatility threshold", step=0.000001, group=G_B, tooltip="12-bar stdev of 30M returns must be at or below this.")
+rsi5SlopeThreshold = input.float(1.209244, "5M RSI slope threshold", step=0.000001, group=G_B, tooltip="(RSI minus RSI 6 bars ago) / 6 must exceed this.")
+ema5SlopeThreshold = input.float(0.007065, "5M EMA spread slope threshold", step=0.000001, group=G_B, tooltip="(spread minus spread 6 bars ago) / 6 must exceed this.")
+
+// ============================================================================
+// SECTION 4 — REGIME AND BIAS INPUTS
+// ============================================================================
+
+adxLen = input.int(14, "ADX length", minval=1, group=G_REG, tooltip="Measured on the Engine A timeframe.")
+adxTrendMin = input.float(20.0, "ADX trending threshold", minval=1, step=0.5, group=G_REG, tooltip="At or above this the market counts as trending, which hands the chart to Engine A. Below it, Engine B may speak.")
+useBias = input.bool(true, "Use higher timeframe bias filter", group=G_REG, tooltip="Blocks longs below the bias EMA and shorts above it.")
+biasTf = input.timeframe("D", "Bias timeframe", group=G_REG, tooltip="D = daily. This is the filter that turned your H4 and D1 tests into confirmation rather than three separate systems.")
+biasLen = input.int(50, "Bias EMA length", minval=1, group=G_REG, tooltip="Close above this EMA on the bias timeframe = up bias.")
+
+// ============================================================================
+// SECTION 5 — RISK INPUTS
+// ============================================================================
+
+useRiskSizing = input.bool(true, "Size positions from risk percent", group=G_RISK,
+     tooltip="ON: quantity is derived from the real stop distance so every trade risks the same percent. OFF: fixed quantity, which is what made the fixed-size backtest look small.")
+riskPct = input.float(1.0, "Risk percent per trade", minval=0.01, step=0.1, group=G_RISK, tooltip="Percent of current strategy equity risked between entry and stop.")
+fixedQty = input.float(1.0, "Fixed quantity (when risk sizing is off)", minval=0.01, step=0.01, group=G_RISK, tooltip="Contracts or ounces per trade.")
+maxTradesPerDay = input.int(3, "Max new trades per day", minval=1, group=G_RISK, tooltip="Counts both engines together. This is the main defence against a cluster of correlated losses.")
+dailyLossStopPct = input.float(3.0, "Daily loss kill switch percent", minval=0.0, step=0.5, group=G_RISK, tooltip="When equity is down this much since the day opened, no new entries for the rest of the day. 0 disables it.")
+useBreakeven = input.bool(true, "Move stop to breakeven at +1R", group=G_RISK, tooltip="Additive safety: once the trade has paid for itself the stop can only improve, never widen.")
+beAtR = input.float(1.0, "Breakeven trigger in R", minval=0.1, step=0.1, group=G_RISK, tooltip="How far in favour the trade must travel, measured in initial risk units.")
+
+// ============================================================================
+// SECTION 6 — GUARD INPUTS
+// ============================================================================
+
+useSession = input.bool(true, "Restrict entries to a session window", group=G_GUARD, tooltip="Exchange time zone of the chart symbol.")
+sessionWindow = input.session("0700-2000", "Session window", group=G_GUARD, tooltip="London open through the New York afternoon by default. Gold outside these hours is thin.")
+useEventBlock = input.bool(true, "Block entries in a daily news window", group=G_GUARD, tooltip="A blunt stand-in for a real economic calendar. The calendar-driven filter belongs in the Python event defence module; this only protects the TradingView test.")
+eventWindow = input.session("1315-1500", "News blackout window", group=G_GUARD, tooltip="Covers the usual CPI / NFP / FOMC release and first reaction. No new entries inside it.")
+useVolBreaker = input.bool(true, "Volatility circuit breaker", group=G_GUARD, tooltip="Blocks new entries when the current ATR spikes far above its own average, which is what a crash candle looks like before it is named.")
+volAtrLen = input.int(14, "Breaker ATR length", minval=1, group=G_GUARD, tooltip="ATR on the chart timeframe.")
+volAvgLen = input.int(100, "Breaker ATR average length", minval=1, group=G_GUARD, tooltip="Bars used for the ATR baseline.")
+volMult = input.float(3.0, "Breaker multiple", minval=1.0, step=0.1, group=G_GUARD, tooltip="Entries stop when ATR exceeds this multiple of its average.")
+
+useClosedHtf = input.bool(true, "Use last CLOSED higher timeframe bar (no repaint)", group=G_HTF,
+     tooltip="ON: history and realtime see the same values. OFF: uses the developing higher timeframe bar, which repaints and flatters every backtest.")
+
+// ============================================================================
+// SECTION 7 — TIMEFRAME GUARDS
+// ============================================================================
+
+chartSec = timeframe.in_seconds(timeframe.period)
+aTfSec = timeframe.in_seconds(pbTf)
+biasSec = timeframe.in_seconds(biasTf)
+
+is5m = timeframe.isminutes and timeframe.multiplier == 5
+aTfOk = aTfSec >= chartSec
+biasTfOk = biasSec >= chartSec
+
+// Engine B is a 5-minute model. On any other chart timeframe it mutes itself
+// rather than firing a signal it was never measured on.
+engineBReady = engineBOn and is5m
+engineAReady = engineAOn and aTfOk
+
+if barstate.islast and (not is5m or not aTfOk)
+    warnTxt = not aTfOk ? "Engine A timeframe is lower than the chart. Raise it." : "Engine B needs a 5-minute chart. It is muted here; Engine A still runs."
+    label.new(bar_index, high, "Gold Router: " + warnTxt,
+         style=label.style_label_down, color=color.orange, textcolor=color.white)
+
+// ============================================================================
+// SECTION 8 — HELPERS
+// ============================================================================
+
+// Engine A features, evaluated on the Engine A timeframe. Both the live and the
+// last-closed value are returned so the user can choose without a second request.
+f_engineA() =>
+    e21 = ta.ema(close, pbFast)
+    e50 = ta.ema(close, pbSlow)
+    a = ta.atr(pbAtrLen)
+    [dip, dim, adxv] = ta.dmi(adxLen, adxLen)
+    slopeUp = e50 > e50[pbSlopeLb]
+    slopeDn = e50 < e50[pbSlopeLb]
+    upTrend = e21 > e50 and (not requireSlope or slopeUp)
+    dnTrend = e21 < e50 and (not requireSlope or slopeDn)
+    // Pullback: the bar tags the fast EMA and closes back on the trend side.
+    lng = upTrend and low <= e21 and close > e21 and close > open
+    sht = dnTrend and high >= e21 and close < e21 and close < open
+    [lng, lng[1], sht, sht[1], a, a[1], adxv, adxv[1]]
+
+f_ema_pair() =>
+    e21 = ta.ema(close, pbFast)
+    e50 = ta.ema(close, pbSlow)
+    [e21, e21[1], e50, e50[1]]
+
+f_bias_pair() =>
+    e = ta.ema(close, biasLen)
+    up = close > e
+    [up, up[1]]
+
+f_spread_pair() =>
+    e9 = ta.ema(close, emaFast)
+    e21 = ta.ema(close, emaSlow)
+    s = ((e9 - e21) / close) * 100.0
+    [s, s[1]]
+
+f_vol_pair() =>
+    ret = close / close[1] - 1.0
+    v = ta.stdev(ret, 12)
+    [v, v[1]]
+
+// Position size from the real stop distance, so risk per trade is constant.
+f_qty(_stopDist) =>
+    _riskCash = strategy.equity * riskPct / 100.0
+    _perUnit = _stopDist * syminfo.pointvalue
+    _sized = _perUnit > 0 ? _riskCash / _perUnit : 0.0
+    useRiskSizing ? _sized : fixedQty
+
+// ============================================================================
+// SECTION 9 — HIGHER TIMEFRAME AND CHART FEATURES
+// ============================================================================
+
+[aLngLive, aLngClosed, aShtLive, aShtClosed, aAtrLive, aAtrClosed, adxLive, adxClosed] = request.security(syminfo.tickerid, pbTf, f_engineA(),
+     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+[e21Live, e21Closed, e50Live, e50Closed] = request.security(syminfo.tickerid, pbTf, f_ema_pair(),
+     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+[biasUpLive, biasUpClosed] = request.security(syminfo.tickerid, biasTf, f_bias_pair(),
+     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+[s15Live, s15Closed] = request.security(syminfo.tickerid, "15", f_spread_pair(),
+     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+[v30Live, v30Closed] = request.security(syminfo.tickerid, "30", f_vol_pair(),
+     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+aLngRaw = useClosedHtf ? aLngClosed : aLngLive
+aShtRaw = useClosedHtf ? aShtClosed : aShtLive
+aAtr = useClosedHtf ? aAtrClosed : aAtrLive
+adxVal = useClosedHtf ? adxClosed : adxLive
+ema21A = useClosedHtf ? e21Closed : e21Live
+ema50A = useClosedHtf ? e50Closed : e50Live
+biasUpRaw = useClosedHtf ? biasUpClosed : biasUpLive
+emaSpread15Pct = useClosedHtf ? s15Closed : s15Live
+volatility30 = useClosedHtf ? v30Closed : v30Live
+
+biasUp = not useBias or biasUpRaw
+biasDn = not useBias or not biasUpRaw
+
+// Chart timeframe features used by Engine B and by the volatility breaker.
+goldRsi5 = ta.rsi(close, rsiLength)
+goldRsiSlope6 = (goldRsi5 - goldRsi5[6]) / 6.0
+ema9_5 = ta.ema(close, emaFast)
+ema21_5 = ta.ema(close, emaSlow)
+emaSpread5Pct = ((ema9_5 - ema21_5) / close) * 100.0
+emaSpread5Slope6 = (emaSpread5Pct - emaSpread5Pct[6]) / 6.0
+atr5 = ta.atr(atrLength)
+atrBreak = ta.atr(volAtrLen)
+atrBreakAvg = ta.sma(atrBreak, volAvgLen)
+emaSpread15Change3 = emaSpread15Pct - emaSpread15Pct[3]
+
+// ============================================================================
+// SECTION 10 — REGIME, GUARDS, DAY STATE
+// ============================================================================
+
+trendRegime = adxVal >= adxTrendMin
+rangeRegime = not trendRegime
+
+inSession = not useSession or not na(time(timeframe.period, sessionWindow))
+inEventBlock = useEventBlock and not na(time(timeframe.period, eventWindow))
+volOk = not useVolBreaker or na(atrBreakAvg) or atrBreak <= volMult * atrBreakAvg
+
+newDay = timeframe.change("D")
+
+var int tradesToday = 0
+var float dayStartEquity = na
+
+if newDay
+    tradesToday := 0
+    dayStartEquity := strategy.equity
+
+dayPnlPct = na(dayStartEquity) or dayStartEquity == 0 ? 0.0 : (strategy.equity - dayStartEquity) * 100.0 / dayStartEquity
+lossStopHit = dailyLossStopPct > 0 and dayPnlPct <= -dailyLossStopPct
+
+gateOpen = barstate.isconfirmed and inSession and not inEventBlock and volOk and not lossStopHit and tradesToday < maxTradesPerDay and strategy.position_size == 0
+
+// ============================================================================
+// SECTION 11 — SIGNAL ENGINE AND ROUTER
+// ============================================================================
+
+// Rising edge: the higher timeframe signal is true for every chart bar inside
+// the higher timeframe bar, so only the first one may trade.
+newALong = engineAReady and aLngRaw and not aLngRaw[1]
+newAShort = engineAReady and aShtRaw and not aShtRaw[1]
+
+var int lastASignalBar = na
+
+if newALong or newAShort
+    lastASignalBar := bar_index
+
+aMuteB = not na(lastASignalBar) and (bar_index - lastASignalBar) < blockBars
+
+aRegimeOk = not aRequireTrendRegime or trendRegime
+takeALong = newALong and aRegimeOk and biasUp and gateOpen
+takeAShort = newAShort and aRegimeOk and biasDn and gateOpen
+
+condEma15 = emaSpread15Change3 > ema15ChangeThreshold
+condVol30 = volatility30 <= vol30Threshold
+condRsi5 = goldRsiSlope6 > rsi5SlopeThreshold
+condEma5 = emaSpread5Slope6 > ema5SlopeThreshold
+familyC = engineBReady and condEma15 and condVol30 and condRsi5 and condEma5
+
+bRegimeOk = rangeRegime
+bBiasOk = allowBAgainstDailyUp or not biasUp
+takeBShort = familyC and bRegimeOk and bBiasOk and not aMuteB and not takeALong and not takeAShort and gateOpen
+
+// ============================================================================
+// SECTION 12 — ORDERS AND TRADE MANAGEMENT
+// ============================================================================
+
+var float pendStop = na
+var float pendRR = na
+var string pendEngine = na
+var float stopPrice = na
+var float targetPrice = na
+var float riskDist = na
+var string activeEngine = na
+var int entryBar = na
+
+if takeALong
+    pendStop := aAtr * pbStopATR
+    pendRR := pbRR
+    pendEngine := "A"
+    strategy.entry("A Long", strategy.long, qty=f_qty(pendStop))
+
+if takeAShort
+    pendStop := aAtr * pbStopATR
+    pendRR := pbRR
+    pendEngine := "A"
+    strategy.entry("A Short", strategy.short, qty=f_qty(pendStop))
+
+if takeBShort
+    pendStop := atr5 * mrStopATR
+    pendRR := mrRR
+    pendEngine := "B"
+    strategy.entry("B Short", strategy.short, qty=f_qty(pendStop))
+
+openedLong = strategy.position_size > 0 and strategy.position_size[1] <= 0
+openedShort = strategy.position_size < 0 and strategy.position_size[1] >= 0
+
+if openedLong or openedShort
+    tradesToday += 1
+    entryBar := bar_index
+    activeEngine := pendEngine
+    riskDist := pendStop
+    stopPrice := openedLong ? strategy.position_avg_price - pendStop : strategy.position_avg_price + pendStop
+    targetPrice := openedLong ? strategy.position_avg_price + pendStop * pendRR : strategy.position_avg_price - pendStop * pendRR
+
+// Breakeven: the stop may only improve, never widen.
+if useBreakeven and strategy.position_size > 0 and not na(riskDist) and high >= strategy.position_avg_price + riskDist * beAtR
+    stopPrice := math.max(stopPrice, strategy.position_avg_price)
+
+if useBreakeven and strategy.position_size < 0 and not na(riskDist) and low <= strategy.position_avg_price - riskDist * beAtR
+    stopPrice := math.min(stopPrice, strategy.position_avg_price)
+
+if strategy.position_size > 0 and activeEngine == "A"
+    strategy.exit("A Long Exit", from_entry="A Long", stop=stopPrice, limit=targetPrice)
+
+if strategy.position_size < 0 and activeEngine == "A"
+    strategy.exit("A Short Exit", from_entry="A Short", stop=stopPrice, limit=targetPrice)
+
+if strategy.position_size < 0 and activeEngine == "B"
+    strategy.exit("B Short Exit", from_entry="B Short", stop=stopPrice, limit=targetPrice)
+
+barsInTrade = strategy.position_size != 0 and not na(entryBar) ? bar_index - entryBar + 1 : 0
+maxBarsNow = activeEngine == "B" ? mrMaxBars : pbMaxBars
+
+if strategy.position_size != 0 and barsInTrade >= maxBarsNow
+    strategy.close_all(comment="Timeout")
+
+// The kill switch also closes an open trade, so a bad day cannot get worse.
+if strategy.position_size != 0 and lossStopHit
+    strategy.close_all(comment="Daily loss stop")
+
+flatNow = strategy.position_size == 0 and strategy.position_size[1] != 0
+
+if flatNow
+    pendStop := na
+    pendRR := na
+    pendEngine := na
+    stopPrice := na
+    targetPrice := na
+    riskDist := na
+    activeEngine := na
+    entryBar := na
+
+// ============================================================================
+// SECTION 13 — PLOTS
+// ============================================================================
+
+plot(engineAReady ? ema21A : na, "Engine A fast EMA", color=color.new(color.aqua, 0), linewidth=1)
+plot(engineAReady ? ema50A : na, "Engine A slow EMA", color=color.new(color.orange, 0), linewidth=1)
+plot(strategy.position_size != 0 ? stopPrice : na, "Stop", color=color.red, linewidth=2, style=plot.style_linebr)
+plot(strategy.position_size != 0 ? targetPrice : na, "Target", color=color.lime, linewidth=2, style=plot.style_linebr)
+
+plotshape(takeALong, title="A BUY", text="A BUY", style=shape.labelup, location=location.belowbar,
+     color=color.green, textcolor=color.white, size=size.tiny)
+plotshape(takeAShort, title="A SELL", text="A SELL", style=shape.labeldown, location=location.abovebar,
+     color=color.maroon, textcolor=color.white, size=size.tiny)
+plotshape(takeBShort, title="B SELL", text="B SELL", style=shape.labeldown, location=location.abovebar,
+     color=color.red, textcolor=color.white, size=size.tiny)
+
+bgcolor(lossStopHit ? color.new(color.red, 90) : inEventBlock ? color.new(color.orange, 92) : not volOk ? color.new(color.purple, 92) : na, title="Guard state")
+
+plot(adxVal, "ADX (Engine A timeframe)", display=display.data_window)
+plot(dayPnlPct, "Day P&L percent", display=display.data_window)
+plot(atrBreak, "Chart ATR", display=display.data_window)
+plot(atrBreakAvg, "Chart ATR average", display=display.data_window)
+
+// ============================================================================
+// SECTION 14 — DASHBOARD
+// ============================================================================
+
+var table dash = table.new(position.top_right, 2, 9, border_width=1)
+
+f_row(_r, _label, _value, _col) =>
+    table.cell(dash, 0, _r, _label, text_color=color.silver, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, _r, _value, text_color=_col, text_size=size.small, text_halign=text.align_right)
+
+if barstate.islast
+    regimeTxt = trendRegime ? "TREND (Engine A)" : "RANGE (Engine B)"
+    biasTxt = not useBias ? "off" : biasUpRaw ? "UP" : "DOWN"
+    guardTxt = lossStopHit ? "DAY STOP" : not volOk ? "VOL BREAK" : inEventBlock ? "NEWS BLOCK" : not inSession ? "OUT OF SESSION" : "OPEN"
+    guardCol = guardTxt == "OPEN" ? color.lime : color.orange
+    posTxt = strategy.position_size == 0 ? "flat" : (strategy.position_size > 0 ? "long " : "short ") + str.tostring(math.abs(strategy.position_size), format.mintick) + " (" + str.tostring(activeEngine) + ")"
+    table.cell(dash, 0, 0, "Gold Router v1", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 0, syminfo.ticker, text_color=color.white, text_size=size.small)
+    f_row(1, "Regime (ADX " + str.tostring(adxVal, "#.0") + ")", regimeTxt, trendRegime ? color.aqua : color.yellow)
+    f_row(2, "Bias " + biasTf, biasTxt, biasTxt == "UP" ? color.lime : biasTxt == "DOWN" ? color.red : color.silver)
+    f_row(3, "Engine A", engineAReady ? (aRegimeOk ? "armed" : "muted by regime") : "off", engineAReady and aRegimeOk ? color.lime : color.gray)
+    f_row(4, "Engine B", engineBReady ? (bRegimeOk and bBiasOk and not aMuteB ? "armed" : "muted") : "off", engineBReady and bRegimeOk and bBiasOk and not aMuteB ? color.lime : color.gray)
+    f_row(5, "Guards", guardTxt, guardCol)
+    f_row(6, "Trades today", str.tostring(tradesToday) + " / " + str.tostring(maxTradesPerDay), tradesToday < maxTradesPerDay ? color.silver : color.orange)
+    f_row(7, "Day P&L", str.tostring(dayPnlPct, "#.00") + " %", dayPnlPct >= 0 ? color.lime : color.red)
+    f_row(8, "Position", posTxt, strategy.position_size == 0 ? color.silver : color.white)
+
+// ============================================================================
+// SECTION 15 — ALERTS
+// ============================================================================
+
+alertcondition(takeALong, "Router: Engine A LONG", "Gold Router Engine A LONG on {{ticker}} at {{close}}")
+alertcondition(takeAShort, "Router: Engine A SHORT", "Gold Router Engine A SHORT on {{ticker}} at {{close}}")
+alertcondition(takeBShort, "Router: Engine B SHORT", "Gold Router Engine B SHORT on {{ticker}} at {{close}}")
+alertcondition(takeALong or takeAShort or takeBShort, "Router: any entry", "Gold Router entry on {{ticker}} at {{close}}")
+
+// ============================================================================
+// SECTION 16 — NOTES, AND WHAT THIS HAS NOT PROVEN
+// ============================================================================
+// Costs: 0.005 percent per side and 3 ticks of slippage are placeholders. Set them
+//   to your own broker's gold spread and commission before reading any result.
+// Engine B thresholds came from a data-mining pass on one dataset. They are the
+//   weakest part of this file. Check them on a locked holdout with the
+//   opposite-direction baseline before trusting them.
+// The news window is a clock, not a calendar. It blocks the same minutes every
+//   day whether or not anything is released. The real calendar filter belongs in
+//   the Python event defence module that already exists in the trading system.
+// Test order that actually answers the question:
+//   1. Engine A alone   (Engine B off)
+//   2. Engine B alone   (Engine A off)
+//   3. Both on          (the router)
+//   If row 3 is not better than the best of rows 1 and 2 on profit factor AND on
+//   drawdown, the combination adds nothing and you should trade the better single
+//   engine. Combining strategies is only worth it when the equity curves are
+//   uncorrelated, and that is measured, not assumed.
+// Trade count is the gate. Fewer than 100 trades in a row means the numbers in it
+//   are noise, whatever the profit factor says.

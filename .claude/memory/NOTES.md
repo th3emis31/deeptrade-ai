@@ -20,3 +20,12 @@
 - 2026-09-12: Added claude-starter-kit/ — portable memory/hooks/skills/loop kit for any project (Python or Node), with install.ps1 and install.sh. Tested against a mock Python project.
 - 2026-09-12: Kit v2: guardrails (mistake prevention, no-duplication, backtest/strategy/train rules) appended to CLAUDE.md; skills /dedupe /backtest /strategy /train; dup-check.sh PostToolUse hook (exit 2 on newly added duplicate definitions, --all for inventory); LESSONS.md + BASELINE.md memory; installers upgrade existing installs (merge hooks into settings.json, refresh hook scripts with backup).
 - 2026-09-14: Kit: added /tv-plan skill (TradingView 4H plan redraw + Paper Trading management, loop-safe, paper-only guards).
+- 2026-09-17: Strategy combination: added strategies/pine/gold_router_v1.pine and
+  strategies/COMBINING.md. The router runs Swing Trend Pullback (21/50 EMA, HTF,
+  Engine A) and Family C Mean Reversion SHORT (5M, Engine B) as one system:
+  ADX regime picks the engine, daily EMA bias picks the direction, Engine A has
+  priority and mutes Engine B for N bars, and both share session / news / ATR
+  circuit-breaker / max-trades-per-day / daily-loss guards plus percent-of-equity
+  risk sizing. Decision rule recorded: the combination is only kept if it beats the
+  better single engine on profit factor AND drawdown. Gold session pullback is NOT
+  combinable (same family as Engine A, correlated losses); ML model only as a veto.
