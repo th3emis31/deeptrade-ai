@@ -67,3 +67,13 @@
   many small wins against fewer larger losses — check the worst single loss before trusting it.
   Still unverified: broker costs, position sizing, request.security repaint, inverse baseline,
   and any period outside the 2023-2026 gold bull run.
+- 2026-09-17: Volatility Trend Breakout "Better Exits" (Gold), 2023-01-02 → 2026-09-17:
+  178 trades, 74.16% wins, PF 1.938, max DD 5.50%, +40.69% on 10K. Better than the previous
+  version on profit, drawdown, win rate, PF and trade count simultaneously.
+  Derived numbers: avg win $63.69 vs avg loss $94.30 (payoff 0.675), expectancy +0.24
+  avg-loss units per trade, and max DD equals exactly 6 average losses. That last number is
+  the weak point: at the observed 26% loss rate a six-loss run is expected 0.05 times in 178
+  trades, but at a 40% loss rate it is expected 0.71 times, so the drawdown estimate depends
+  on the win rate holding. RISK TO CHECK: tighter take-profits mean more bars where both the
+  stop and the target sit inside the same bar, and without Bar Magnifier (paid plans only)
+  TradingView assumes the intrabar order. The better the exits look, the more this matters.
