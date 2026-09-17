@@ -48,7 +48,13 @@ does exactly that, behind a toggle so the original behaviour can still be reprod
 If the result barely moves, the strategy is sound. If it drops sharply, the exits
 were an artefact of the fill model rather than an edge.
 
-## Finding 2 — no margin requirement, so leverage is unbounded
+## Finding 2 — no margin requirement, so leverage is unbounded (MEASURED: never bound)
+
+> **Update, same day.** Across 136 positions on 4H gold 2023-2026, the 5x leverage
+> cap was never reached: zero capped entries. Gold's ATR stayed wide enough that
+> risk sizing never asked for more than 5x. The cap is worth keeping as a guard,
+> but it is not changing any historical result. The concern below stands as a
+> future risk, not a present one.
 
 `strategy()` does not set `margin_long`, which means the tester assumes 0% margin
 and therefore infinite leverage. Position size comes from risk divided by stop

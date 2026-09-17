@@ -127,3 +127,9 @@
   initial risk, since per-leg R overstated partial exits.
   STILL NOT CLEARED: walk-forward with fixed folds, deflated Sharpe, a 4H bear-regime run,
   the volume filter (Twelve Data has no volume for spot gold), live spread around releases.
+- 2026-09-17: Audit finding 2 also measured and immaterial: across 136 positions the 5x
+  leverage cap was never reached (zero capped entries) because gold's ATR stays wide enough.
+  Keep the cap as a forward guard, but it changes no historical row. Exact v1 parity run
+  (TP1 at bar close, no cap): 213 legs, 71.83% wins, PF 1.763, +39.65%, DD 6.34% — within
+  1% of the v2 configuration. Raising risk 0.85% → 1.0% scales the result linearly
+  (+47.85%, DD 7.91%), confirming the sizing path is correct.
