@@ -195,3 +195,16 @@
   SCOREBOARD (profit factor): FVG is positive on gold daily 1.390, gold 4H 1.225,
   BTC 4H 1.303, EURUSD 1.093 — the most robust thing measured here. The breakout beats it
   only in a gold uptrend (1.750) and trails elsewhere.
+- 2026-09-23: INCIDENT (live): the project's own data/auto_trader_state.json reports
+  trades: 0 with keys [session, trades, settings, jarvis], while the running Flask process
+  reports 129 trades. A second, also empty, state file exists at C:\Users\th_em\data\ —
+  created when the app was started from the wrong working directory. Restarting the server
+  while disk holds 0 trades would destroy the history, so the process must stay alive until
+  a copy with 129 trades is located or its memory is captured over HTTP.
+  Added scripts/inspect_trader_state.py — READ ONLY scanner that walks the user folder and
+  every zip, reports bytes / mtime / valid JSON / trade count / session mode / balance for
+  each copy, flags corrupt and truncated files, and names the best copy. Tested against a
+  fixture with a good backup, an emptied live file and a truncated file.
+  Note for later: `cd $HOME\...` is PowerShell syntax and fails in cmd.exe, where it is
+  %USERPROFILE%. The user has been running cmd, which is how the earlier command read the
+  wrong file.
