@@ -208,3 +208,21 @@
   Note for later: `cd $HOME\...` is PowerShell syntax and fails in cmd.exe, where it is
   %USERPROFILE%. The user has been running cmd, which is how the earlier command read the
   wrong file.
+- 2026-09-23: INCIDENT RESOLVED, and my earlier alarm was overstated. The scanner found the
+  129 trades in SEVENTEEN places, including inside the project itself at
+  ml_trading_system\data\auto_trader_state.json.bak-20260912 (241,255 bytes, 12 Sep 15:52,
+  session mt5_live). Nothing was ever at risk of being lost.
+  What actually happened: the live file is 54,194 bytes dated 22 Sep 23:26 with session
+  mt4_live and an empty trades list. It is NOT a truncated or reset file — 54KB of settings
+  and jarvis state are intact. The 129 trades belonged to the mt5_live session of 12 Sep.
+  Between then and 22 Sep a NEW session was started in mt4_live mode and the trades list
+  came up empty. The rolling .bak from three minutes earlier (23:23) is also empty, so the
+  trades were already gone before that write.
+  TESTS ARE EXONERATED: tests\test_approval_bypass.py and tests\test_execute_api_security.py
+  both monkeypatch load_auto_trader_state and save_auto_trader_state, so they never touch
+  the real file. My hypothesis that a test wrote over live data was wrong.
+  The "129 trades live in memory" reading came from a transcript dated 12 Sep, eleven days
+  stale. Lesson: check the timestamp on a pasted transcript before treating it as current
+  state.
+  STILL OPEN AND NOW TOP PRIORITY: app.py binds 0.0.0.0 with no authentication on
+  /api/auto-trade/execute, which places live MT5 orders.
