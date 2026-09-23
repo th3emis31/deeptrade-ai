@@ -110,3 +110,58 @@ Each new one raises the chance that the best row is the luckiest row rather than
 the best strategy. Nothing further should be decided by trying another variant on
 this data. The remaining questions need new information: walk-forward with
 parameters fixed before each fold, a different instrument, or live demo fills.
+
+---
+
+# Out-of-sample: instruments that had nothing to do with building this
+
+## BTCUSD 4H, June 2024 to September 2026
+
+| | Legs | Win rate | Profit factor | Net | Max drawdown |
+|---|---|---|---|---|---|
+| **FVG alone** | 195 | 67.18% | **1.303** | **+15.80%** | **5.19%** |
+| Breakout + FVG | 213 | 63.38% | 1.100 | +3.88% | 10.91% |
+| Breakout alone | 115 | 59.13% | 0.975 | −2.52% | 8.11% |
+| CRT alone | 239 | 58.16% | 0.962 | −8.61% | 19.85% |
+
+Fair value gaps carried to a different asset class: 195 legs, profit factor 1.303,
+a 5.19% drawdown. Nothing about this data was involved in designing the rules.
+The breakout did not carry, which fits what we already know about it needing a
+trend, and Bitcoin spent much of this window ranging.
+
+## EURUSD daily, 2004-2019
+
+| | Legs | Win rate | Profit factor | Net |
+|---|---|---|---|---|
+| FVG alone | 207 | 63.29% | 1.093 | +5.32% |
+| Breakout + FVG | 229 | 63.32% | 1.079 | +4.80% |
+| Breakout alone | 61 | 57.38% | 1.051 | +0.81% |
+| CRT alone | 249 | 57.83% | 0.904 | −11.20% |
+
+Barely above break-even. Honest reading: on a major currency pair over sixteen
+years these rules have no meaningful edge, and a profit factor of 1.09 would not
+survive a wider spread.
+
+### The bug that nearly produced a false answer
+
+The first EURUSD run showed profit factors near 0.02 and losses of 80%. That was
+not the strategy. The tick size defaulted to 0.01, which is correct for gold and
+Bitcoin and catastrophically wrong for a 1.20 instrument: two ticks of slippage
+became 0.02, larger than the entire 1.5 ATR stop. Every trade paid more in
+slippage than it risked.
+
+`portfolio_backtest.py` now warns when slippage exceeds 10% of a typical stop
+distance, so the same mistake announces itself instead of reading as a result.
+
+## Where the evidence stands
+
+| Instrument | FVG | Breakout |
+|---|---|---|
+| Gold, daily 2004-2019 | 1.390 | 1.376 |
+| Gold, 4H 2023-2026 | 1.225 | 1.750 |
+| Bitcoin, 4H 2024-2026 | 1.303 | 0.975 |
+| EURUSD, daily 2004-2019 | 1.093 | 1.051 |
+
+FVG is positive on all four, across two asset classes and two decades, which is
+the most robust thing measured in this repository. The breakout is stronger than
+FVG in a gold uptrend and weaker everywhere else. Neither is strong on EURUSD.

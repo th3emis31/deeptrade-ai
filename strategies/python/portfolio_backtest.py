@@ -30,6 +30,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("csv")
     ap.add_argument("--tf", default="?")
+    ap.add_argument("--mintick", type=float, default=0.01,
+                    help="price increment of the instrument. 0.01 for gold and BTC, 0.0001 for most FX. "
+                         "Getting this wrong turns slippage into a fortune and every row into nonsense.")
+    ap.add_argument("--commission", type=float, default=0.04, help="percent per side")
     ap.add_argument("--regime-daily", action="store_true",
                     help="apply the daily regime gate to the breakout leg only")
     args = ap.parse_args(argv)
@@ -38,8 +42,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("bars: %d   %s -> %s   timeframe: %s\n"
           % (len(candles), candles[0].ts, candles[-1].ts, args.tf))
 
-    cfg = Config(use_volume=False, use_regime=args.regime_daily, regime_daily=args.regime_daily)
-    flat = Config(use_volume=False)
+    cfg = Config(use_volume=False, use_regime=args.regime_daily, regime_daily=args.regime_daily,
+                 mintick=args.mintick, commission_pct=args.commission)
+    flat = Config(use_volume=False, mintick=args.mintick, commission_pct=args.commission)
+
+    # Sanity guard: slippage must be small against the risk the strategy takes.
+    from volatility_trend_breakout import atr as _atr
+    a = [x for x in _atr(candles, flat.atr_len) if x is not None]
+    if a:
+        typical_risk = flat.sl_atr_mult * (sum(a) / len(a))
+        slip = flat.slippage_ticks * flat.mintick
+        if slip > typical_risk * 0.1:
+            print("WARNING: slippage of %.5f is %.1f%% of a typical %.5f stop distance. "
+                  "The mintick is probably wrong for this instrument, and every row below is noise.\n"
+                  % (slip, 100.0 * slip / typical_risk, typical_risk))
 
     brk = generate_signals(candles, cfg)
     fvg = fvg_signals(candles, flat)

@@ -183,3 +183,15 @@
   history. Further variants on this data raise selection bias without adding information.
   The only next steps that add information are walk-forward with fixed folds, a different
   instrument, and live demo fills.
+- 2026-09-17: OUT-OF-SAMPLE INSTRUMENTS. BTCUSD 4H (Jun 2024 - Sep 2026), never involved in
+  building anything: FVG alone PF 1.303, +15.80%, DD 5.19%, 195 legs — it CARRIES to another
+  asset class. Breakout alone PF 0.975 (-2.52%), consistent with needing a trend; CRT 0.962.
+  EURUSD daily 2004-2019: FVG 1.093, breakout 1.051, CRT 0.904 — no meaningful edge on a
+  major FX pair, and 1.09 would not survive a wider spread.
+  BUG CAUGHT: the first EURUSD run showed PF ~0.02 and -80%. Cause was mintick defaulting to
+  0.01, right for gold and BTC, catastrophic for a 1.20 instrument: 2 ticks = 0.02 slippage,
+  larger than the whole 1.5 ATR stop. portfolio_backtest.py now WARNS when slippage exceeds
+  10% of a typical stop distance. Always set --mintick per instrument (0.0001 for FX).
+  SCOREBOARD (profit factor): FVG is positive on gold daily 1.390, gold 4H 1.225,
+  BTC 4H 1.303, EURUSD 1.093 — the most robust thing measured here. The breakout beats it
+  only in a gold uptrend (1.750) and trails elsewhere.
