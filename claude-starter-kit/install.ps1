@@ -20,15 +20,45 @@ function SKIP($m){ Write-Host "  [--] $m (exists, kept)" -ForegroundColor Yellow
 function WARN($m){ Write-Host "  [!!] $m" -ForegroundColor Red }
 
 # bash is not optional: every hook in this kit is a .sh script invoked through it.
-# Git for Windows puts bash.exe in <Git>\bin, which its recommended setup leaves OFF
-# the PATH, so without this check the install prints all-green while no guardrail runs.
+# Git for Windows puts bash.exe in <Git>\bin, which its recommended setup leaves OFF the
+# PATH, so without this gate the install prints all-green while no guardrail ever runs.
+# The directory differs per machine (Program Files for a system install, AppData for a
+# per-user one), so it is derived from wherever git actually is rather than guessed.
 if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
   Write-Host "FAIL: 'bash' is not on PATH." -ForegroundColor Red
   Write-Host "      Every hook in this kit runs through bash. Without it, backups before edits," -ForegroundColor Red
   Write-Host "      post-edit checks and the session banner all silently do nothing." -ForegroundColor Red
-  Write-Host "      Install Git for Windows and add its bin directory, e.g." -ForegroundColor Yellow
-  Write-Host '        setx PATH "$env:PATH;C:\Program Files\Git\bin"' -ForegroundColor Yellow
-  Write-Host "      then open a NEW terminal and run this installer again." -ForegroundColor Yellow
+
+  $bashDir = $null
+  $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+  if ($gitCmd) {
+    # git.exe usually sits in <Git>\cmd or <Git>\bin; bash.exe is in <Git>\bin.
+    $gitRoot = Split-Path -Parent (Split-Path -Parent $gitCmd.Source)
+    $candidate = Join-Path $gitRoot "bin\bash.exe"
+    if (Test-Path $candidate) { $bashDir = Split-Path -Parent $candidate }
+  }
+  if (-not $bashDir) {
+    foreach ($guess in @(
+        "$env:ProgramFiles\Git\bin",
+        "${env:ProgramFiles(x86)}\Git\bin",
+        "$env:LOCALAPPDATA\Programs\Git\bin",
+        "$env:USERPROFILE\scoop\apps\git\current\bin")) {
+      if (Test-Path (Join-Path $guess "bash.exe")) { $bashDir = $guess; break }
+    }
+  }
+
+  if ($bashDir) {
+    Write-Host ""
+    Write-Host "      Found bash at: $bashDir\bash.exe" -ForegroundColor Green
+    Write-Host "      Run this EXACT command, then open a NEW terminal and run this installer again:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "        setx PATH `"%PATH%;$bashDir`"" -ForegroundColor Cyan
+    Write-Host ""
+  } else {
+    Write-Host "      No bash.exe found in any usual Git location either." -ForegroundColor Yellow
+    Write-Host "      Install Git for Windows: winget install --id Git.Git -e --source winget" -ForegroundColor Yellow
+    Write-Host "      then add its bin directory to PATH and run this installer again." -ForegroundColor Yellow
+  }
   exit 1
 }
 

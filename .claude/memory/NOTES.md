@@ -318,3 +318,11 @@
   d92637e (27 Sep): app.py is 31,822 lines with 250 routes, 72 of them writes, and only TWO
   carry a secret check (/api/auto-trade/execute and /api/voice/verify). Seventy write
   endpoints are unauthenticated on a host bound to 0.0.0.0.
+- 2026-09-27: The bash PATH fix failed because I named the wrong directory. This machine has
+  Git at C:\Users\th_em\AppData\Local\Programs\Git (a per-user install), not Program Files.
+  install.ps1 now derives bash's directory from `Get-Command git` (git.exe sits in <Git>\cmd,
+  bash.exe in <Git>\bin), falls back to four common locations, and prints the exact setx line
+  for that machine instead of a generic example.
+  Also: the owner's second run still copied files before the gate because they were running
+  install.ps1 from before commit 00f1fd6. Nothing was harmed — every file reported
+  "exists, kept".

@@ -38,3 +38,6 @@
 - A file I could not execute is a file I did not test. install.ps1 was edited and shipped
   without running, and it failed on the owner's first attempt. When a change cannot be run
   here, say so in the same message that delivers it.
+- Do not hardcode an install location. Git for Windows lives in Program Files for a system
+  install and in AppData\Local\Programs for a per-user one; telling the owner the wrong path
+  cost a terminal restart for nothing. Derive the path from where the tool actually is.
