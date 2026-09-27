@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Install the Claude starter kit (memory, brain, context, loop, skills, hooks) into a project.
 .EXAMPLE
@@ -120,7 +120,7 @@ if (-not $SkipGitInit -and (Get-Command git -ErrorAction SilentlyContinue)) {
   if (-not (Test-Path ".git")) {
     git init -q
     OK "git repository created (nothing committed)"
-    WARN "Review before committing — a blind 'git add -A' on a trading project commits the"
+    WARN "Review before committing  -  a blind 'git add -A' on a trading project commits the"
     WARN "virtualenv, live model binaries, the trade history and any webhook secret:"
     git status --short | Select-Object -First 40
     WARN "then commit yourself: git add -A; git commit -m 'Initial import + Claude starter kit'"

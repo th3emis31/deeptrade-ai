@@ -296,3 +296,12 @@
   11. start.cmd and start.sh ship in the project root, and README documents the user-level
      SessionStart guard, which is the only hook that can fire when Claude is started outside
      the project at all.
+- 2026-09-27: I BROKE install.ps1 AND THE OWNER HIT IT. My earlier edit inserted a line
+  containing an em dash. The file had no BOM, PowerShell 5.1 read it as ANSI, and the dash
+  became three characters including 0x94 (a curly closing quote), which unbalanced the
+  string quoting and produced "Missing closing '}' in statement block" at line 120 — a line
+  with nothing wrong with it. Fixed: install.ps1 is now pure ASCII and carries a BOM, and
+  scripts/check-ps1.py enforces both, verified by planting a bad file and watching it fail.
+  Also confirmed by the owner's `fc /b`: ml_trading_system had the OLD session-start.sh, so
+  the local session's "already byte-identical" claim was wrong. Verify with a comparison,
+  not an assertion.

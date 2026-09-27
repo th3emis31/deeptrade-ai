@@ -30,3 +30,11 @@
 - Do not ask a human for a parameter the data already contains. Tick size, timeframe and
   instrument class are now detected from the file and reported with the reason. The one
   parameter a person had to supply is the one that produced the worst result in this project.
+- PowerShell 5.1 reads a file without a byte-order mark as ANSI. A UTF-8 em dash then
+  becomes three characters, one of which is a curly closing quote the parser treats as a
+  string delimiter, so the quotes unbalance and the error appears far away as
+  "Missing closing '}' in statement block" pointing at an innocent line. Every .ps1 must be
+  pure ASCII with a BOM; scripts/check-ps1.py enforces it.
+- A file I could not execute is a file I did not test. install.ps1 was edited and shipped
+  without running, and it failed on the owner's first attempt. When a change cannot be run
+  here, say so in the same message that delivers it.
