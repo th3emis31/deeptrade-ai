@@ -242,3 +242,18 @@
   Could not run the 30M backtest the owner asked for: Alpha Vantage gates intraday gold
   behind a premium plan and Twelve Data needs re-authorising, so no 30-minute data source
   is reachable from the cloud session. The local machine has the bars.
+- 2026-09-27: AUTO-DETECTION, after the owner's point that the detectors should decide rather
+  than be told. strategies/python/detect.py infers the timeframe from the median gap between
+  bars, the instrument class from the median price, and the tick size from the file's own
+  decimal places floored by what the class can actually trade (API feeds carry spurious
+  decimals: gold arrives with 6). It also warns when two ticks of slippage exceed half a
+  typical bar. Both runners now call it when --mintick, --commission or --tf are omitted, and
+  print what was decided and why before any table.
+  Verified: gold 4H still gives PF 1.750 with zero flags, BTC and gold daily detect correctly,
+  and EURUSD — the case that produced PF 0.02 and -80% from a wrong tick size — now
+  self-corrects to a 1e-05 tick with no flags at all.
+  Also added: scripts/doctor.py (also copied into the kit) with a /doctor skill, and a /recall
+  skill for searching prior work before repeating it. LESSONS.md created in this project.
+  The doctor's first run flagged two false positives (YOUR_BOT_TOKEN and a documentation
+  placeholder); the classifier was tightened and tested against 7 known cases before being
+  trusted.

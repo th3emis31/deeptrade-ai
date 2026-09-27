@@ -29,16 +29,29 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("csv")
-    ap.add_argument("--tf", default="?")
-    ap.add_argument("--mintick", type=float, default=0.01,
-                    help="price increment of the instrument. 0.01 for gold and BTC, 0.0001 for most FX. "
-                         "Getting this wrong turns slippage into a fortune and every row into nonsense.")
-    ap.add_argument("--commission", type=float, default=0.04, help="percent per side")
+    ap.add_argument("--tf", default=None)
+    ap.add_argument("--mintick", type=float, default=None,
+                    help="price increment. Detected from the data when omitted, which is safer than "
+                         "remembering that gold is 0.01 and EURUSD is 0.0001.")
+    ap.add_argument("--commission", type=float, default=None, help="percent per side. Detected when omitted.")
     ap.add_argument("--regime-daily", action="store_true",
                     help="apply the daily regime gate to the breakout leg only")
     args = ap.parse_args(argv)
 
     candles = load_csv(args.csv)
+    from detect import detect
+    setup = detect(candles, args.csv)
+    print(setup.explain())
+    for w in setup.warnings:
+        print("    ^ this must be resolved before any number below means anything")
+    print()
+    if args.mintick is None:
+        args.mintick = setup.mintick
+    if args.commission is None:
+        args.commission = setup.commission_pct
+    if args.tf is None:
+        args.tf = setup.timeframe
+
     print("bars: %d   %s -> %s   timeframe: %s\n"
           % (len(candles), candles[0].ts, candles[-1].ts, args.tf))
 

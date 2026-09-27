@@ -646,12 +646,13 @@ def format_report(m: dict, label: str) -> str:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("csv", help="OHLCV CSV: datetime, open, high, low, close, volume")
-    ap.add_argument("--tf", default="?", help="timeframe label for the report")
+    ap.add_argument("--tf", default=None, help="timeframe label. Detected when omitted.")
     ap.add_argument("--capital", type=float, default=10_000.0)
     ap.add_argument("--risk", type=float, default=0.85, help="percent of equity per trade")
-    ap.add_argument("--commission", type=float, default=0.04, help="percent per side")
+    ap.add_argument("--commission", type=float, default=None, help="percent per side. Detected when omitted.")
     ap.add_argument("--slippage-ticks", type=float, default=2.0)
-    ap.add_argument("--mintick", type=float, default=0.01)
+    ap.add_argument("--mintick", type=float, default=None,
+                    help="price increment. Detected from the data when omitted.")
     ap.add_argument("--max-leverage", type=float, default=5.0, help="0 disables the cap")
     ap.add_argument("--tp1-model", choices=("limit", "close"), default="limit",
                     help="limit = realistic resting order, close = Pine v1 market-at-close")
@@ -669,6 +670,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     candles = load_csv(args.csv)
+    from detect import detect
+    setup = detect(candles, args.csv)
+    print(setup.explain())
+    for w in setup.warnings:
+        print("    ^ this must be resolved before any number below means anything")
+    print()
+    if args.mintick is None:
+        args.mintick = setup.mintick
+    if args.commission is None:
+        args.commission = setup.commission_pct
+    if args.tf is None:
+        args.tf = setup.timeframe
+
     if len(candles) < 100:
         sys.stderr.write("Only %d candles loaded. Not enough to test anything.\n" % len(candles))
         return 2
