@@ -71,3 +71,31 @@ in to each server with `/mcp`.
   `.claude/settings.local.json` (git-ignored).
 - `scripts/claude-hooks/check-after-edit.sh` — add your linter or test command.
 - Add skills as `.claude/skills/<name>/SKILL.md`.
+
+
+## Starting in the right directory
+
+Claude started outside the project root loads no CLAUDE.md, no skills and no hooks,
+and relative paths resolve where you started instead of in the project. The kit cannot
+warn you from inside the project, because when this happens its settings file is never
+read at all.
+
+Two ways to close that gap:
+
+1. **Use the shipped launcher.** `start.cmd` on Windows or `./start.sh` elsewhere. Both
+   change directory to the project root first and then start Claude, from wherever you
+   run them.
+
+2. **Add a user-level guard**, which is the only hook that runs regardless of directory.
+   In `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command",
+        "command": "test -f CLAUDE.md || echo '!!! No CLAUDE.md here — you are probably not in a project root. Skills, memory and hooks are NOT loaded.'" } ] }
+    ]
+  }
+}
+```

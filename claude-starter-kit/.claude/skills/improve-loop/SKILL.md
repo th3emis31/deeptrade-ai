@@ -25,3 +25,13 @@ built-in loop: `/loop 30m /improve-loop` (or `/loop /improve-loop` self-paced).
 
 Hard rules: one improvement per iteration; no deletions; no secrets; no push to `main`;
 if nothing safe is left, say so and stop.
+
+Never, in any iteration: run the live or broker code path, start a server that can place
+orders, or place, modify or close an order. An unattended iteration may read, measure, edit,
+test and commit — nothing else. A rule written in another file is not a constraint on this
+loop; this paragraph is.
+
+Stop conditions, so the loop cannot grind: three consecutive iterations with no safe
+improvement found, or three consecutive verify failures, ends the loop with a report.
+Every iteration writes one line to NOTES.md naming what it changed, so a scheduled run can
+be attributed afterwards.

@@ -12,11 +12,6 @@
       "Bash(npm install)",
       "Bash(npm ci)",
       "Bash(node:*)",
-      "Bash(python:*)",
-      "Bash(python3:*)",
-      "Bash(py:*)",
-      "Bash(pip install:*)",
-      "Bash(pytest:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
@@ -33,8 +28,12 @@
       "Bash(grep:*)",
       "Bash(find:*)",
       "Bash(mkdir:*)",
-      "Bash(cp:*)",
-      "Bash(bash scripts/*)"
+      "Bash(python -m pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python3 -m py_compile:*)",
+      "Bash(pip install -r requirements.txt)",
+      "Bash(git rev-parse:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -47,7 +46,16 @@
       "Read(.env.*)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
-      "Read(**/secrets*)"
+      "Read(**/secrets*)",
+      "Write(models/**)",
+      "Edit(models/**)",
+      "Write(data/**)",
+      "Edit(data/**)",
+      "Write(.claude/settings.json)",
+      "Edit(.claude/settings.json)",
+      "Write(scripts/claude-hooks/**)",
+      "Edit(scripts/claude-hooks/**)",
+      "Read(**/*webhook*.json)"
     ]
   },
   "hooks": {
@@ -56,34 +64,34 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/claude-hooks/session-start.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks/session-start.sh\""
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/claude-hooks/backup-before-edit.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks/backup-before-edit.sh\""
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/claude-hooks/check-after-edit.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks/check-after-edit.sh\"",
             "timeout": 180
           },
           {
             "type": "command",
-            "command": "bash scripts/claude-hooks/dup-check.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks/dup-check.sh\"",
             "timeout": 60
           }
         ]
@@ -94,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/claude-hooks/stop-check.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks/stop-check.sh\""
           }
         ]
       }

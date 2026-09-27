@@ -1,31 +1,42 @@
 #!/usr/bin/env bash
-# SessionStart: prove the session is wired correctly, then show memory and git state.
-# Never fails — a broken check prints a warning, it does not stop the session.
+# SessionStart: prove the session is wired correctly, anchor it in time, then show
+# memory and git state. Never fails — a broken check prints a warning, it does not
+# stop the session.
 set -u; . "$(dirname "$0")/_common.sh"
 
 ROOT="$(root_dir)"
-HERE="$(pwd -P)"
+HERE="$(norm "$(pwd -P)")"
 
 # ---------------------------------------------------------------------------
 # 1. WORKING DIRECTORY. Starting Claude outside the project root silently
-#    disables CLAUDE.md, every skill, and every hook — including the ones that
-#    back up files before edits. Relative paths then resolve into the home
-#    folder, which is how a stray data/ directory gets created and written to.
+#    disables CLAUDE.md, every skill and every hook, and relative paths then
+#    resolve into the home folder, which is how a stray data/ directory gets
+#    created and written to.
+#
+#    Note the limit honestly: when Claude starts outside the project, this hook
+#    is not registered at all, so this banner cannot appear. Catching that case
+#    needs a SessionStart hook in the USER-level ~/.claude/settings.json, or the
+#    start.cmd shipped in the project root. See README.
 # ---------------------------------------------------------------------------
-if [ "$HERE" != "$ROOT" ]; then
+if [ "$(printf '%s' "$HERE" | tr 'A-Z' 'a-z')" != "$(printf '%s' "$ROOT" | tr 'A-Z' 'a-z')" ]; then
   echo "!!! WRONG DIRECTORY ---------------------------------------------------"
   echo "!!! Claude started in : $HERE"
   echo "!!! Project root is   : $ROOT"
-  echo "!!! Memory, skills and hooks are NOT loaded, and relative paths will"
-  echo "!!! resolve here rather than in the project. Exit and restart with:"
-  echo "!!!     cd \"$ROOT\" && claude --continue"
+  echo "!!! Relative paths will resolve where you started, not in the project."
+  echo "!!! Exit and restart with:  cd \"$ROOT\" && claude --continue"
   echo "!!! ------------------------------------------------------------------"
 fi
 cd "$ROOT" || exit 0
 
 # ---------------------------------------------------------------------------
-# 2. WIRING. Say plainly what is and is not loaded, rather than letting the
-#    session assume its guardrails exist.
+# 2. TIME ANCHOR. "Check the date of a pasted transcript" is unusable advice if
+#    the session was never told what now is. An 11-day-old paste was once read
+#    as live state because of exactly this gap.
+# ---------------------------------------------------------------------------
+echo "=== now === $(date -u +%Y-%m-%dT%H:%MZ)   HEAD: $(git log -1 --format='%h %ad %s' --date=short 2>/dev/null | cut -c1-70)"
+
+# ---------------------------------------------------------------------------
+# 3. WIRING, and whether the guardrails actually ran last session.
 # ---------------------------------------------------------------------------
 missing=""
 [ -f CLAUDE.md ] || missing="$missing CLAUDE.md"
@@ -35,30 +46,61 @@ missing=""
 if [ -n "$missing" ]; then
   echo "!!! MISSING WIRING:$missing  — run the kit installer before trusting this session."
 else
-  skills=$(ls .claude/skills 2>/dev/null | tr '\n' ' ')
-  echo "=== wiring ok === root=$ROOT  skills: $skills"
+  echo "=== wiring ok === $ROOT  skills: $(ls .claude/skills 2>/dev/null | tr '\n' ' ')"
+fi
+
+if [ -f .claude/hook-log ]; then
+  last="$(tail -1 .claude/hook-log | cut -f1)"
+  echo "    hooks last ran: ${last:-never}  ($(wc -l < .claude/hook-log | tr -d ' ') recorded invocations)"
+  for h in backup-before-edit check-after-edit dup-check; do
+    grep -q "	$h	" .claude/hook-log 2>/dev/null || echo "    WARNING: $h has never run — it may not be wired or bash may be missing"
+  done
+else
+  echo "    WARNING: no .claude/hook-log — either this is the first session, or no hook has ever run."
 fi
 
 # ---------------------------------------------------------------------------
-# 3. THE REPORTING CONTRACT. These are the rules that were learned the
-#    expensive way. They are printed every session because a rule nobody reads
+# 4. IS THE BRAIN STILL BEING WRITTEN TO? A memory that stopped recording looks
+#    identical to a healthy one, because the old notes still scroll past.
+# ---------------------------------------------------------------------------
+now_s=$(date -u +%s)
+for f in NOTES LESSONS BASELINE; do
+  path=".claude/memory/$f.md"
+  if [ -f "$path" ]; then
+    m=$(date -u -r "$path" +%s 2>/dev/null || echo "$now_s")
+    days=$(( (now_s - m) / 86400 ))
+    line="    $f.md last written $days day(s) ago"
+    [ "$f" = "NOTES" ] && [ "$days" -gt 2 ] && line="$line   <-- memory may have stopped recording; check the second-brain plugin's status and its provider allowance"
+    echo "$line"
+  else
+    echo "    $f.md MISSING"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# 5. THE REPORTING CONTRACT, printed every session because a rule nobody reads
 #    is not a rule.
 # ---------------------------------------------------------------------------
 cat <<'RULES'
 === before reporting ANY measured number ===
-  1. Units: price increment per instrument (0.01 gold/BTC, 0.0001 most FX).
-     A wrong tick size makes slippage larger than the stop and every row noise.
-  2. Scale: the stop must be wider than a typical bar. When both stop and
-     target sit inside one candle, the convention decides the trade, not the market.
-  3. Control: run the inverse. An edge that does not beat its own inverse is drift.
-  4. Sample: under 100 closed trades is "insufficient evidence", whatever the
-     profit factor says.
-  5. Provenance: a pasted transcript is not current state. Check its date.
-  A number that has not passed 1 to 5 is not reported as a result.
+  1. Units: price increment per instrument, and every ratio parameter's unit
+     (_pct is 0-100, _frac is 0-1, _bps is basis points). Detect, do not assume.
+  2. Scale: the stop must be wider than a typical bar, and no threshold may be an
+     absolute price when the data spans a large price range.
+  3. Causality: signals use only bars up to t; say which bar the fill happens on.
+  4. Control: run the inverse. Zero inverse trades is not a control.
+  5. Sample: under 100 closed trades is insufficient evidence.
+  6. Provenance: a pasted transcript is not current state. Check its date against
+     the "now" printed above.
 RULES
 
+# Print the lessons file itself. Grepping for bullet starts silently dropped the
+# second line of every wrapped lesson, which is where the instruction lived.
+if [ -f .claude/memory/LESSONS.md ]; then
+  echo "=== lessons (.claude/memory/LESSONS.md) ==="
+  tail -n 40 .claude/memory/LESSONS.md
+fi
 [ -f .claude/memory/NOTES.md ] && { echo "=== session memory (last 40 lines) ==="; tail -n 40 .claude/memory/NOTES.md; }
-[ -f .claude/memory/LESSONS.md ] && { echo "=== lessons ==="; grep -E "^- " .claude/memory/LESSONS.md | tail -n 15; }
 [ -f .claude/memory/BACKLOG.md ] && { echo "=== open backlog items ==="; grep -n '^- \[ \]' .claude/memory/BACKLOG.md | head -10; }
 echo "=== git ==="; git status --short --branch 2>/dev/null | head -20 || echo "(not a git repo yet — run: git init)"
 exit 0

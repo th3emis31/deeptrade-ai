@@ -59,8 +59,14 @@ not a result and is not written into a table.
 - **Scale.** The stop must be wider than a typical bar. Count the bars where both
   stop and target fall inside one candle, report that count, and treat a high one
   as the convention deciding the result rather than the market.
+- **Causality.** A signal at bar t uses only bars up to t. State which bar the fill
+  happens on. If a feature could have been computed only after the trade, the result
+  is void however good it looks.
+- **Control.** Run the inverse direction on the same data. An edge that does not
+  clearly beat its own inverse is drift. An inverse that produces zero trades is not
+  a control, it is a free pass.
 - **Provenance.** A pasted transcript or screenshot is not current state. Check
-  its date before acting on it.
+  its date against the "now" printed in the session banner before acting on it.
 
 Under 100 closed trades, label the row insufficient evidence. Run the inverse as
 a control every time, and treat an inverse with zero trades as no control at all.

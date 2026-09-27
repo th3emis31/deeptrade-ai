@@ -257,3 +257,42 @@
   The doctor's first run flagged two false positives (YOUR_BOT_TOKEN and a documentation
   placeholder); the classifier was tightened and tested against 7 known cases before being
   trusted.
+- 2026-09-27: KIT AUDIT AND REPAIR. A full audit of claude-starter-kit against the ten
+  failures that actually happened found 15 defects. The worst: every hook was invoked as
+  `bash scripts/...` with a relative path, and install.ps1 never checked that bash exists,
+  so on a normal Git for Windows setup the install printed all-green while backup-before-edit,
+  check-after-edit, dup-check, session-start and stop-check all silently did nothing.
+  Fixed and verified in this order:
+  1. Hook commands now use "$CLAUDE_PROJECT_DIR" absolute paths; NotebookEdit added to the
+     matchers; install.ps1 aborts when bash is missing instead of warning.
+  2. _common.sh normalises backslashes and derives the root from the script's own location
+     rather than git (a home directory that is not a repo used to resolve to itself, so the
+     wrong-directory check passed in exactly the case it existed for). Verified: a Windows
+     backslash path now backs up to src/deep/thing.py with its structure intact.
+  3. Hooks that cannot identify their file now say so on stderr instead of exiting quietly,
+     and every invocation is recorded in .claude/hook-log, which the session banner reads
+     back so "did the guardrails run?" is answerable.
+  4. Backups prune by AGE (14 days) not by count, and never prune snapshots containing data,
+     models or state. Count-based pruning deleted the previous day's snapshot during a busy
+     afternoon.
+  5. dup-check anchors definitions at column zero, so two classes each having close() no
+     longer block every edit. Verified: methods ignored, a real module-level duplicate still
+     blocks with exit 2.
+  6. check-after-edit no longer prints "compile OK" for a parse check. It says SYNTAX ONLY,
+     not verified, and runs the fast test suite when tests/ exists.
+  7. Permissions: removed Bash(py:*), Bash(cp:*), Bash(bash scripts/*), Bash(pip install:*)
+     and bare Bash(python:*), which together let any file be mutated with no prompt, no
+     backup and no check. Added deny entries for models/, data/, the hook scripts and
+     settings.json itself.
+  8. /verify step 5 must use a real dry-run flag and may never start the server; /improve-loop
+     now carries the no-order rule in its own body plus stop conditions; /measure gained
+     parameter-unit and stationarity pre-flight items.
+  9. BASELINE.md schema now has columns for timeframe, tick, cost with its unit, price range,
+     fill bar, ambiguous exits, configs tried and inverse PF — the six places every wrong
+     number would have been visible.
+  10. gitignore.append covers data/, models/, *.pkl, *.joblib, venvs and webhook json, and
+     neither installer auto-commits any more: they print git status and ask the owner to
+     review first.
+  11. start.cmd and start.sh ship in the project root, and README documents the user-level
+     SessionStart guard, which is the only hook that can fire when Claude is started outside
+     the project at all.

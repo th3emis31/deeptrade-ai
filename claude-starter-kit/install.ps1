@@ -23,7 +23,7 @@ Write-Host "Claude starter kit -> $Target"
 
 # 1. Copy files without overwriting
 $files = Get-ChildItem -Path $Kit -Recurse -File | Where-Object {
-  $_.Name -notin @("install.ps1","install.sh","README.md","gitignore.append") -and $_.DirectoryName -notlike "*claude-md-sections*"
+  $_.Name -notin @("install.ps1","install.sh","gitignore.append") -and $_.DirectoryName -notlike "*claude-md-sections*"
 }
 foreach ($f in $files) {
   $rel = $f.FullName.Substring($Kit.Length).TrimStart('\','/')
@@ -61,7 +61,7 @@ foreach ($sec in Get-ChildItem (Join-Path $Kit "claude-md-sections") -Filter *.m
   if ($cur -notlike "*$marker*") { Add-Content -Path $claudeMd -Value (Get-Content $sec.FullName -Raw); OK "CLAUDE.md += $($marker.TrimStart('# '))" }
 }
 $lessons = Join-Path $Target ".claude\memory\LESSONS.md"
-if (Test-Path $lessons) { (Get-Content $lessons -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $lessons -NoNewline }
+if (Test-Path $lessons) { (Get-Content $lessons -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $lessons -Encoding UTF8 }
 
 # 1c. Merge new hooks into an existing settings.json (never removes anything)
 $sj = Join-Path $Target ".claude\settings.json"
@@ -73,7 +73,7 @@ if ((Test-Path $sj) -and ((Get-Content $sj -Raw) -notmatch "dup-check\.sh")) {
   $newHook = [pscustomobject]@{ type = "command"; command = "bash scripts/claude-hooks/dup-check.sh"; timeout = 60 }
   if ($grp) { $grp.hooks = @($grp.hooks) + $newHook }
   else { $cfg.hooks.PostToolUse = @($cfg.hooks.PostToolUse) + [pscustomobject]@{ matcher = "Edit|Write|MultiEdit"; hooks = @($newHook) } }
-  $cfg | ConvertTo-Json -Depth 10 | Set-Content $sj
+  $cfg | ConvertTo-Json -Depth 10 | Set-Content $sj -Encoding UTF8
   OK ".claude/settings.json += dup-check hook"
 }
 
@@ -89,10 +89,22 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Target ".claude\backups") 
 
 # 3. Date the first memory note
 $notes = Join-Path $Target ".claude\memory\NOTES.md"
-if (Test-Path $notes) { (Get-Content $notes -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $notes -NoNewline }
+if (Test-Path $notes) { (Get-Content $notes -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $notes -Encoding UTF8 }
 
 # 4. Tooling checks
-foreach ($t in @("git","claude","node","python")) {
+# bash is not optional: every hook in this kit is a .sh script invoked through it.
+# Git for Windows puts bash.exe in <Git>\bin, which its recommended setup leaves OFF
+# the PATH, so without this check the install prints all-green while no guardrail runs.
+if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
+  Write-Host "FAIL: 'bash' is not on PATH." -ForegroundColor Red
+  Write-Host "      Every hook in this kit runs through bash. Without it, backups before edits," -ForegroundColor Red
+  Write-Host "      post-edit checks and the session banner all silently do nothing." -ForegroundColor Red
+  Write-Host "      Install Git for Windows and add its bin directory, e.g." -ForegroundColor Yellow
+  Write-Host '        setx PATH "$env:PATH;C:\Program Files\Git\bin"' -ForegroundColor Yellow
+  Write-Host "      then open a NEW terminal and run this installer again." -ForegroundColor Yellow
+  exit 1
+}
+foreach ($t in @("git","claude","node","python","bash")) {
   if (Get-Command $t -ErrorAction SilentlyContinue) { OK "$t found" } else { WARN "$t not found on PATH" }
 }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -105,7 +117,14 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
 # 5. git init (so backups, diffs and /verify work)
 if (-not $SkipGitInit -and (Get-Command git -ErrorAction SilentlyContinue)) {
   Push-Location $Target
-  if (-not (Test-Path ".git")) { git init -q; git add -A; git commit -q -m "Initial import + Claude starter kit"; OK "git repository created with first commit" }
+  if (-not (Test-Path ".git")) {
+    git init -q
+    OK "git repository created (nothing committed)"
+    WARN "Review before committing — a blind 'git add -A' on a trading project commits the"
+    WARN "virtualenv, live model binaries, the trade history and any webhook secret:"
+    git status --short | Select-Object -First 40
+    WARN "then commit yourself: git add -A; git commit -m 'Initial import + Claude starter kit'"
+  }
   else { OK "git repository present" }
   Pop-Location
 }

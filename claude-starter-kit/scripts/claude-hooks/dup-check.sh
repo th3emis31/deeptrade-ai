@@ -6,7 +6,10 @@
 #   With --all: prints every name defined in more than one place (used by /dedupe).
 set -u; . "$(dirname "$0")/_common.sh"
 root="$(root_dir)"; cd "$root" || exit 0
-DEF_RE='^\s*(def|class|async def|function|export function|export default function|export class|class)\s+([A-Za-z_][A-Za-z0-9_]*)'
+# Anchored at column zero. Indented definitions are class methods, and two classes
+# each having close() or update() is ordinary code, not duplication. Matching those
+# made the hook block routine edits, which teaches everyone to ignore hook output.
+DEF_RE='^(def|class|async def|function|export function|export default function|export class)\s+([A-Za-z_][A-Za-z0-9_]*)'
 EXCL='(^|/)(\.claude|node_modules|dist|build|\.git|__pycache__|\.venv|venv|site-packages)/'
 all_defs(){ grep -rnE --include='*.py' --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' "$DEF_RE" . 2>/dev/null \
   | grep -vE "$EXCL" | sed -E "s#^\./##; s#^([^:]+):([0-9]+):\s*(async def|export default function|export function|export class|def|class|function)\s+([A-Za-z_][A-Za-z0-9_]*).*#\4\t\1:\2#"; }
@@ -14,9 +17,10 @@ if [ "${1:-}" = "--all" ]; then
   all_defs | sort | awk -F'\t' '{n[$1]++; loc[$1]=loc[$1]" "$2} END{for(k in n) if(n[k]>1) printf "%s (%d)\t%s\n", k, n[k], loc[k]}' | sort
   exit 0
 fi
-file="$(cat | tool_file)"; [ -z "$file" ] && exit 0
+HOOK_STDIN="$(cat)"; export HOOK_STDIN
+file="$(tool_file)"; [ -z "$file" ] && { log_hook dup-check "UNKNOWN FILE"; exit 0; }
 case "$file" in *.py|*.js|*.jsx|*.ts|*.tsx) ;; *) exit 0 ;; esac
-case "$file" in "$root"/*) rel="${file#$root/}";; *) rel="$file";; esac
+rel="$(rel_path "$file" "$root")"
 [ -f "$rel" ] || exit 0
 # names newly added in this file (unstaged diff vs HEAD; untracked file => all its defs)
 if git ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
@@ -35,6 +39,8 @@ for name in $added; do
 done
 if [ -n "$report" ]; then
   echo "DUPLICATE DEFINITION(S) — consolidate before continuing (import/extend the existing one; do not rename to bypass):$report" >&2
+  log_hook dup-check "blocked: $rel"
   exit 2
 fi
+log_hook dup-check "ok: $rel"
 exit 0

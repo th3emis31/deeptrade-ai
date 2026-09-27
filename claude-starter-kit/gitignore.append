@@ -8,3 +8,17 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+
+# Trading project contents. Committing these is how a webhook secret, a live model
+# binary and the whole trade history end up in git history in one `git add -A`.
+data/
+models/
+*.pkl
+*.joblib
+*.h5
+*.log
+*.sqlite
+.venv/
+venv/
+config.local.json
+*webhook*.json

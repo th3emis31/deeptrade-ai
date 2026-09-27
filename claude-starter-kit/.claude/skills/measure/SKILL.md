@@ -28,6 +28,17 @@ a table is written, not after someone objects to it.
 5. **Provenance.** Where did the data come from, what dates does it span, and is
    any pasted transcript or screenshot actually current? Check the timestamp.
 
+6. **Parameter units.** Every ratio-valued parameter states its unit: `_pct` is 0 to 100,
+   `_frac` is 0 to 1, `_bps` is basis points. Assert the range where it is consumed
+   (`assert 0 <= cost_frac < 0.01`). Report the round-trip cost in basis points beside the
+   result and check it against the broker's real spread. A cost argument named percent that
+   is really a fraction charges a hundred times too much, and the symptom — everything
+   loses — is identical to the wrong tick size, so the diagnosis goes to the wrong place.
+7. **Stationarity.** State the minimum and maximum price in the sample. If the ratio exceeds
+   1.5, no threshold may be an absolute price or a dollar amount: express it in ATR, percent
+   or basis points. Report the metric split across at least three equal sub-periods. A result
+   that exists in only one sub-period is a regime artefact, not an edge.
+
 ## The sample rule
 
 Under 100 closed trades the row is labelled **insufficient evidence**, whatever
