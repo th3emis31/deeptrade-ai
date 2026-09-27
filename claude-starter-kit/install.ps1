@@ -19,6 +19,19 @@ function OK($m){ Write-Host "  [OK] $m" -ForegroundColor Green }
 function SKIP($m){ Write-Host "  [--] $m (exists, kept)" -ForegroundColor Yellow }
 function WARN($m){ Write-Host "  [!!] $m" -ForegroundColor Red }
 
+# bash is not optional: every hook in this kit is a .sh script invoked through it.
+# Git for Windows puts bash.exe in <Git>\bin, which its recommended setup leaves OFF
+# the PATH, so without this check the install prints all-green while no guardrail runs.
+if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
+  Write-Host "FAIL: 'bash' is not on PATH." -ForegroundColor Red
+  Write-Host "      Every hook in this kit runs through bash. Without it, backups before edits," -ForegroundColor Red
+  Write-Host "      post-edit checks and the session banner all silently do nothing." -ForegroundColor Red
+  Write-Host "      Install Git for Windows and add its bin directory, e.g." -ForegroundColor Yellow
+  Write-Host '        setx PATH "$env:PATH;C:\Program Files\Git\bin"' -ForegroundColor Yellow
+  Write-Host "      then open a NEW terminal and run this installer again." -ForegroundColor Yellow
+  exit 1
+}
+
 Write-Host "Claude starter kit -> $Target"
 
 # 1. Copy files without overwriting
@@ -92,18 +105,6 @@ $notes = Join-Path $Target ".claude\memory\NOTES.md"
 if (Test-Path $notes) { (Get-Content $notes -Raw) -replace "<date>", (Get-Date -Format "yyyy-MM-dd") | Set-Content $notes -Encoding UTF8 }
 
 # 4. Tooling checks
-# bash is not optional: every hook in this kit is a .sh script invoked through it.
-# Git for Windows puts bash.exe in <Git>\bin, which its recommended setup leaves OFF
-# the PATH, so without this check the install prints all-green while no guardrail runs.
-if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
-  Write-Host "FAIL: 'bash' is not on PATH." -ForegroundColor Red
-  Write-Host "      Every hook in this kit runs through bash. Without it, backups before edits," -ForegroundColor Red
-  Write-Host "      post-edit checks and the session banner all silently do nothing." -ForegroundColor Red
-  Write-Host "      Install Git for Windows and add its bin directory, e.g." -ForegroundColor Yellow
-  Write-Host '        setx PATH "$env:PATH;C:\Program Files\Git\bin"' -ForegroundColor Yellow
-  Write-Host "      then open a NEW terminal and run this installer again." -ForegroundColor Yellow
-  exit 1
-}
 foreach ($t in @("git","claude","node","python","bash")) {
   if (Get-Command $t -ErrorAction SilentlyContinue) { OK "$t found" } else { WARN "$t not found on PATH" }
 }

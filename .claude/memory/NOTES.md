@@ -305,3 +305,16 @@
   Also confirmed by the owner's `fc /b`: ml_trading_system had the OLD session-start.sh, so
   the local session's "already byte-identical" claim was wrong. Verify with a comparison,
   not an assertion.
+- 2026-09-27: CONFIRMED FROM THE OWNER'S MACHINE — the kit's worst defect was real. The
+  repaired installer printed "FAIL: 'bash' is not on PATH", which means every hook in
+  ml_trading_system has been silently doing nothing since it was installed: no backup before
+  any edit, no post-edit check, no duplicate guard, no session banner. That is the
+  explanation for a fortnight of unguarded mistakes.
+  Two follow-up fixes here: the bash gate ran at step 4, AFTER every file had been copied, so
+  it aborted once the work was already done — moved ahead of the copy. And gitignore.append
+  now covers *.bak and *.bak_*, because the owner's push committed twenty app.py.bak_* files,
+  1.14 MiB, into git history.
+  Also attached th3emis31/ml-trading-system to this session and read the real code at
+  d92637e (27 Sep): app.py is 31,822 lines with 250 routes, 72 of them writes, and only TWO
+  carry a secret check (/api/auto-trade/execute and /api/voice/verify). Seventy write
+  endpoints are unauthenticated on a host bound to 0.0.0.0.
