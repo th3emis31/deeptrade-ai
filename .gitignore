@@ -6,3 +6,7 @@ dist/
 .claude/settings.local.json
 CLAUDE.local.md
 .DS_Store
+
+# Python build artifacts (regenerated on every run; never source)
+__pycache__/
+*.pyc
