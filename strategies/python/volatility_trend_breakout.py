@@ -401,10 +401,46 @@ class Result:
     equity_curve: List[float] = field(default_factory=list)
     capped_entries: int = 0
     final_equity: float = 0.0
+    # Bars where the stop AND a target were both inside the same candle. The engine
+    # takes the stop, which is the safe convention and also a lie about that trade:
+    # nobody knows which came first. A high count means the levels are too tight for
+    # the bar size and the whole result is decided by convention, not by the market.
+    ambiguous_exits: int = 0
 
 
 def _round_tick(price: float, mintick: float) -> float:
     return round(price / mintick) * mintick if mintick > 0 else price
+
+
+def preflight(candles: Sequence[Candle], cfg: Config = Config()) -> List[str]:
+    """Checks that must pass before any number from this engine is believed.
+
+    Every wrong result this project has produced came from a unit or scale mistake,
+    not from the strategy logic. These catch that class before it becomes a table.
+    """
+    problems: List[str] = []
+    a = [x for x in atr(candles, cfg.atr_len) if x is not None]
+    if not a:
+        return ["not enough bars to compute ATR"]
+    mean_atr = sum(a) / len(a)
+    ranges = sorted(c.high - c.low for c in candles)
+    median_bar = ranges[len(ranges) // 2]
+    risk = cfg.sl_atr_mult * mean_atr
+    slip = cfg.slippage_ticks * cfg.mintick
+
+    if risk < median_bar * 1.5:
+        problems.append(
+            "stop distance %.5f is only %.1fx the median bar range %.5f. Bars will straddle "
+            "both levels and the stop-first rule, not the market, will decide those trades. "
+            "Use finer bars or a wider stop." % (risk, risk / median_bar, median_bar))
+    if slip > risk * 0.1:
+        problems.append(
+            "slippage %.5f is %.1f%% of the %.5f stop distance. The mintick is probably wrong "
+            "for this instrument (0.01 gold and BTC, 0.0001 most FX)." % (slip, 100 * slip / risk, risk))
+    prices = [c.close for c in candles]
+    if min(prices) <= 0:
+        problems.append("the data contains a non-positive price")
+    return problems
 
 
 def backtest(candles: Sequence[Candle], cfg: Config = Config(),
@@ -487,6 +523,9 @@ def backtest(candles: Sequence[Candle], cfg: Config = Config(),
             hit_stop = bar.low <= active_stop if long else bar.high >= active_stop
             hit_tp1 = (bar.high >= tp1 if long else bar.low <= tp1) and not tp1_taken
             hit_tp2 = bar.high >= tp2 if long else bar.low <= tp2
+
+            if hit_stop and (hit_tp1 or hit_tp2):
+                res.ambiguous_exits += 1
 
             if hit_stop:
                 close_leg(active_stop, remaining, "stop", bar.ts, True)
@@ -580,6 +619,7 @@ def metrics(res: Result, cfg: Config) -> dict:
         "max_dd_pct": 100.0 * max_dd_pct,
         "longest_losing_streak": worst_streak,
         "size_capped_entries": res.capped_entries,
+        "ambiguous_exits": res.ambiguous_exits,
     }
 
 
@@ -596,6 +636,7 @@ def format_report(m: dict, label: str) -> str:
         ("max drawdown", "%.2f USD  (%.2f %% of peak equity)" % (m["max_dd_usd"], m["max_dd_pct"])),
         ("longest losing streak", "%d legs" % m["longest_losing_streak"]),
         ("entries capped by leverage", "%d" % m["size_capped_entries"]),
+        ("ambiguous exits (both levels in one bar)", "%d" % m["ambiguous_exits"]),
     ]
     width = max(len(r[0]) for r in rows)
     body = "\n".join("  %-*s  %s" % (width, k, v) for k, v in rows)
@@ -642,6 +683,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                       regime_ema_len=args.regime_ema, adx_min=args.adx_min,
                       regime_daily=args.regime_daily,
                       regime_daily_ema_len=args.regime_daily_ema)
+
+    warnings = preflight(candles, cfg_for(False))
+    for w in warnings:
+        print("PRE-FLIGHT WARNING: %s\n" % w)
+    if warnings:
+        print("Numbers below are NOT trustworthy until the warnings above are resolved.\n")
 
     print("bars: %d   %s -> %s   timeframe: %s   TP1 fill: %s   leverage cap: %s   regime gate: %s"
           % (len(candles), candles[0].ts, candles[-1].ts, args.tf, args.tp1_model,

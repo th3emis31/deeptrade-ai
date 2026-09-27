@@ -226,3 +226,19 @@
   state.
   STILL OPEN AND NOW TOP PRIORITY: app.py binds 0.0.0.0 with no authentication on
   /api/auto-trade/execute, which places live MT5 orders.
+- 2026-09-27: SETUP HARDENING, after the owner identified that the mistakes came from
+  the context/loop/tools/skills wiring rather than from strategy code.
+  1. session-start.sh now fails loudly when Claude is started outside the project root
+     (the cause of the stray home-folder data directory), lists which wiring actually
+     loaded, and prints the five-point reporting contract every session.
+  2. New /measure skill: the contract for producing a trustworthy number — units, scale,
+     causality, control, provenance; the 100-trade evidence rule; how to report; what to
+     do when a result turns out wrong; and a configuration counter for selection bias.
+  3. Guardrails and LESSONS.md now carry the three failure modes in rule form.
+  4. The engine itself now has preflight() and an ambiguous-exit counter: it refuses to
+     present numbers as trustworthy when slippage exceeds 10% of the stop distance or the
+     stop is under 1.5x the median bar range. Verified firing on a wrong mintick and a
+     deliberately tight stop, and silent on correct settings.
+  Could not run the 30M backtest the owner asked for: Alpha Vantage gates intraday gold
+  behind a premium plan and Twelve Data needs re-authorising, so no 30-minute data source
+  is reachable from the cloud session. The local machine has the bars.

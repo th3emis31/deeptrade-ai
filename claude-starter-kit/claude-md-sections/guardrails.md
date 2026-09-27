@@ -46,3 +46,42 @@
   function with the same weights. If they differ, fix that before any new training.
 - **Overfitting checks**: parameter sweeps report out-of-sample results only; a strategy
   with fewer than ~100 trades in the test period is "insufficient evidence", not a result.
+
+## Measuring, and the three ways a number goes wrong
+
+Before reporting any measured number, run the `/measure` pre-flight. Units,
+scale, causality, control, provenance. A number that has not passed all five is
+not a result and is not written into a table.
+
+- **Units.** State the instrument's price increment. 0.01 for gold and Bitcoin,
+  0.0001 for most FX. A wrong tick size makes slippage exceed the stop, and then
+  everything loses, including bets that should be coin flips.
+- **Scale.** The stop must be wider than a typical bar. Count the bars where both
+  stop and target fall inside one candle, report that count, and treat a high one
+  as the convention deciding the result rather than the market.
+- **Provenance.** A pasted transcript or screenshot is not current state. Check
+  its date before acting on it.
+
+Under 100 closed trades, label the row insufficient evidence. Run the inverse as
+a control every time, and treat an inverse with zero trades as no control at all.
+
+## The working directory is a safety device
+
+Claude started outside the project root loads no CLAUDE.md, no skills and no
+hooks, and relative paths resolve into the home folder instead of the project.
+That is how a stray `data/` directory appears and gets written to. Always start
+with `cd <project root>` first, and read the session-start banner: it says
+plainly whether the wiring loaded.
+
+## Unattended loops never place orders
+
+A loop that runs on a schedule may draw, measure, record and report. Placing,
+modifying or closing an order requires the invocation to ask for it explicitly in
+that run. An unattended loop that trades produces positions the owner cannot
+account for later.
+
+## Corrections outrank results
+
+When a reported number turns out to be wrong, say so in the first line of the
+next message, name the cause, write the rule into LESSONS.md, and add the guard
+or test that makes it impossible to repeat silently. Never defend a number.
