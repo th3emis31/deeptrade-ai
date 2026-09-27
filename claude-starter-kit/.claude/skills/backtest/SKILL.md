@@ -1,5 +1,6 @@
 ---
 name: backtest
+family: trading
 description: Run or build a leak-free, cost-aware backtest and record comparable metrics against the baseline. Use when the user says backtest, test the strategy, historical performance, walk-forward, or out-of-sample.
 ---
 
@@ -30,3 +31,15 @@ Extend it; do not write a second engine.
 4. Write results to `.claude/memory/BASELINE.md` as a new dated row with the commit hash.
 5. Compare with the previous row and state clearly: better / worse / not significant.
 6. Never tune parameters on the test period. If you sweep, sweep on train and report test.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+appended: .claude/memory/BASELINE.md
+number: trades >= 100
+run: python scripts/doctor.py --quiet --skip-secrets
+ask: does the reported window sit OUTSIDE the period the parameters were chosen on?
+```

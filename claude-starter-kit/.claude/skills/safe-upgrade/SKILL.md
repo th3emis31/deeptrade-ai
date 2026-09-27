@@ -1,5 +1,6 @@
 ---
 name: safe-upgrade
+family: software
 description: Make an additive, zero-error improvement to this project. Use for any feature, fix, or refactor request. Never deletes; backs up, edits minimally, runs checks, verifies, commits.
 ---
 
@@ -21,3 +22,14 @@ Owner's standing rule: **always improve, always safe, nothing deleted, no errors
 5. **Verify** — run `/verify`. `git diff --stat` must show only intended files.
 6. **Record and commit** — append a dated line to `.claude/memory/NOTES.md`; commit on a
    `claude/*` branch with an imperative message. Never push to `main`; never force-push.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+file: .claude/backups
+run: python scripts/doctor.py --quiet --skip-secrets
+ask: does the diff only add and refine, with nothing removed that something still depends on?
+```

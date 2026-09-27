@@ -1,5 +1,6 @@
 ---
 name: strategy
+family: trading
 description: Write, review, or refine a trading strategy as a testable hypothesis document before any code. Use when the user says strategy, new idea, entry rules, exit rules, edge, setup, or asks whether an idea is worth building.
 ---
 
@@ -28,3 +29,14 @@ the hypothesis. Do not start coding until sections 1–8 are testable.
 ## Duplication guard
 Before creating a strategy file, `ls strategies/` and grep the codebase for the same idea.
 Extend an existing document rather than creating a near-duplicate.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+file: strategies
+appended: .claude/memory/NOTES.md
+ask: is the idea written as a falsifiable hypothesis, with the observation that would kill it named?
+```

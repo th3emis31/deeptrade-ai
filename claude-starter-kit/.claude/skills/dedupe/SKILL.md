@@ -1,5 +1,6 @@
 ---
 name: dedupe
+family: software
 description: Find and consolidate duplicated functions, classes, formulas, and status files without deleting behaviour. Use when the user mentions duplication, "same code twice", two versions of X, or before large features on a monolith.
 ---
 
@@ -21,3 +22,14 @@ description: Find and consolidate duplicated functions, classes, formulas, and s
 3. **Status/summary files**: do not delete them; add a line to NOTES.md marking them stale.
 4. **Verify** with `/verify` and the tests. Commit one consolidation per commit.
 5. **Record** each consolidation in NOTES.md and add remaining groups to BACKLOG.md.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+run: bash scripts/claude-hooks/dup-check.sh --all
+appended: .claude/memory/NOTES.md
+ask: was the surviving definition extended, rather than a second one renamed to slip past the check?
+```

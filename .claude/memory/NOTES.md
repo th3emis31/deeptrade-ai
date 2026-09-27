@@ -326,3 +326,19 @@
   Also: the owner's second run still copied files before the gate because they were running
   install.ps1 from before commit 00f1fd6. Nothing was harmed — every file reported
   "exists, kept".
+- 2026-09-27: SECURITY DONE on the owner's machine, verified by their session: Flask bound to
+  127.0.0.1 (LAN refused), require_control_secret on six endpoints, three already protected,
+  and /api/auto-trade/execute deliberately left undecorated so its own guard keeps writing
+  rejections to data/execution_rejections.jsonl. Two UI callers fixed so buttons do not 403.
+  21 new tests plus 15 existing security tests pass; full suite 1304 passed.
+  They also found and stopped TWO duplicate start_trading.bat loops from 26 Sep, each keeping
+  its own app.py alive on 0.0.0.0:5000, so requests had been served nondeterministically by
+  one of two processes.
+  The 2 remaining test failures were MINE: tests/test_skill_acceptance.py requires every
+  SKILL.md to carry `family:` in the front matter and an ```acceptance block with at least one
+  check adjudicated by something other than the model (run/file/number/appended). The four
+  skills from my kit — measure, tv-plan, doctor, recall — carried neither. Fixed in the kit,
+  and the other nine kit skills were tagged too so a future install cannot reintroduce it.
+  Verified against their own parser's regexes: 13 of 13 now compliant.
+  NOTE for the owner: copy ONLY those four. Their local copies of the other nine already carry
+  better, project-specific acceptance blocks; the kit versions would be a downgrade.

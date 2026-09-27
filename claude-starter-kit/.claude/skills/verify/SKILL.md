@@ -1,5 +1,6 @@
 ---
 name: verify
+family: software
 description: Full safety check before commit — compile/build, tests if present, deleted-code audit, secret scan. Use before every commit or when asked "is it safe".
 ---
 
@@ -28,3 +29,14 @@ Report each step PASS or FAIL with evidence. Do not commit on any FAIL.
 6. **Memory** — append the outcome to `.claude/memory/NOTES.md`.
 
 Final line: `VERIFY: PASS` or `VERIFY: FAIL (<step>)`.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+run: python scripts/doctor.py --quiet
+file: .claude/hook-log
+ask: was the run command exercised with its dry-run flag, and never started as a live server?
+```

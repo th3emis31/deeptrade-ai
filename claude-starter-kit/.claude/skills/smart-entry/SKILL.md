@@ -1,5 +1,6 @@
 ---
 name: smart-entry
+family: trading
 description: Design, review, or improve the automated smart entry system (entry/SL/TP, risk sizing, regime and session gating, confidence, execution safety). Use when the user mentions entries, signals, execution, risk, SL/TP, orders, or "smart entry".
 ---
 
@@ -35,3 +36,14 @@ if they are missing.
 ## Review mode
 Output a table: rule → PASS/FAIL/N-A → file:line → concrete fix. Then apply the fixes
 with `/safe-upgrade` unless told otherwise.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+run: python scripts/doctor.py --quiet --skip-secrets
+appended: .claude/memory/NOTES.md
+ask: does every new entry carry a direction, a stop, at least one target, a size from the sizing function, and a regime and session check?
+```

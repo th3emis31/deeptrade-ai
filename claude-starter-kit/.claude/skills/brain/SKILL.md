@@ -1,5 +1,6 @@
 ---
 name: brain
+family: core
 description: Read or update the project's persistent memory (CLAUDE.md, .claude/memory/NOTES.md, BACKLOG.md). Use when the user says "remember", "what did we decide", "memory", "context", or "brain".
 ---
 
@@ -22,3 +23,14 @@ Commands:
   and fill them in now.
 
 Never delete memory lines; strike through with `~~` if obsolete.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+appended: .claude/memory/NOTES.md
+file: .claude/memory/LESSONS.md
+ask: can the new entry be traced to a measurement or a dated event rather than an impression?
+```

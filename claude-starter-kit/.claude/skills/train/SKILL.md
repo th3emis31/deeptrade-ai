@@ -1,5 +1,6 @@
 ---
 name: train
+family: trading
 description: Safe model training protocol — leak-free time split, versioned artifacts, evaluation against the baseline, explicit promotion. Use when the user says train, retrain, fit the model, update the model, or improve accuracy.
 ---
 
@@ -34,3 +35,14 @@ and extend it. Do not create a parallel trainer.
     the same ensemble function with the same weights. If not, fix that first.
 
 Never delete old model folders; never train on the test period; never promote silently.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one check below is adjudicated by something other than the model.
+
+```acceptance
+appended: .claude/memory/BASELINE.md
+run: python scripts/doctor.py --quiet --skip-secrets
+ask: was promotion a separate, explicitly agreed step, rather than something training did on its own?
+```

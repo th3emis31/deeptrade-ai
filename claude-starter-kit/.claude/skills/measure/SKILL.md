@@ -1,5 +1,6 @@
 ---
 name: measure
+family: core
 description: The contract for producing a number anyone can trust — pre-flight checks, the inverse control, the sample-size rule, and how to report a result honestly. Use before ANY backtest, sweep, statistic or performance claim.
 ---
 
@@ -68,3 +69,15 @@ row is the luckiest row. Count how many have been tried and say the number when
 reporting. Past roughly ten, stop, and get new evidence instead: a different
 period, a different instrument, a walk-forward with parameters fixed per fold,
 or live demo fills.
+
+## Acceptance
+
+This skill may not report success on its own say-so.
+At least one of these is adjudicated by something other than the model.
+
+```acceptance
+appended: .claude/memory/BASELINE.md
+number: trades >= 100
+run: python scripts/doctor.py --quiet --skip-secrets
+ask: was the pre-flight printed BEFORE the numbers, and does the row name its tick size, its cost unit and its ambiguous-exit count?
+```
