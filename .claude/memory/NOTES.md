@@ -342,3 +342,13 @@
   Verified against their own parser's regexes: 13 of 13 now compliant.
   NOTE for the owner: copy ONLY those four. Their local copies of the other nine already carry
   better, project-specific acceptance blocks; the kit versions would be a downgrade.
+- 2026-09-27: THE HOOKS RAN FOR THE FIRST TIME AND IMMEDIATELY EXPOSED TWO OF MY BUGS, both
+  found by reading the owner's .claude/hook-log rather than the code.
+  1. Paths logged absolute (C:/Users/th_em/ml_trading_system/tests/test_write_auth.py) instead
+     of relative. Cause: Git Bash's pwd -P returns /c/Users/... while Claude Code passes
+     C:\Users\..., so rel_path never matched and the backup destination became
+     .claude/backups/<ts>/C:/Users/... — a directory named "C:". norm() now folds a drive
+     letter to the /c/ form. Verified on the exact four shapes from the log plus a Linux path.
+  2. dup-check BLOCKED their new tests/test_write_auth.py twice. Two pytest modules each
+     defining a fixture named client() or app() is idiomatic, not duplication. Test files are
+     now exempt, verified: a test file duplicating a name exits 0 and says why in the log.

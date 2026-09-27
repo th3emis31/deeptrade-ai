@@ -20,6 +20,13 @@ fi
 HOOK_STDIN="$(cat)"; export HOOK_STDIN
 file="$(tool_file)"; [ -z "$file" ] && { log_hook dup-check "UNKNOWN FILE"; exit 0; }
 case "$file" in *.py|*.js|*.jsx|*.ts|*.tsx) ;; *) exit 0 ;; esac
+# Test files are exempt. Two pytest modules each defining a fixture called client(),
+# app() or make_bars() is the normal shape of a test suite, and blocking on it teaches
+# everyone to ignore this hook. It blocked a legitimate new test file twice on
+# 27 September 2026, which is how this exemption was found.
+case "$file" in */tests/*|*/test/*|*_test.py|*/test_*.py|*.test.js|*.spec.js|*.test.ts|*.spec.ts)
+  log_hook dup-check "skipped (test file): $file"; exit 0 ;;
+esac
 rel="$(rel_path "$file" "$root")"
 [ -f "$rel" ] || exit 0
 # names newly added in this file (unstaged diff vs HEAD; untracked file => all its defs)

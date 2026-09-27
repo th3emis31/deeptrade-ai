@@ -1,14 +1,19 @@
 # shared helpers for hooks (sourced)
 #
-# Two rules learned the hard way:
-#   * Windows hands us C:\a\b while git hands back C:/a/b, so every path is
-#     normalised to forward slashes before anything is compared. Without this the
-#     project-relative path never matched, so backups landed flat and the
-#     duplicate checker treated every tracked file as brand new.
+# Three rules learned the hard way:
+#   * Windows hands us C:\a\b, Git Bash's pwd hands back /c/a/b, and comparing the
+#     two never matches. Everything is canonicalised to the /c/a/b form before any
+#     comparison, or the project-relative path silently stays absolute and backups
+#     land in a directory literally named "C:".
 #   * A hook that cannot tell what it was given says so on stderr. Passing quietly
 #     is how a file gets edited with no backup and nobody notices.
+#   * A guard that cries wolf gets ignored, so it must not fire on ordinary code.
 
-norm(){ printf '%s' "$1" | tr '\\' '/'; }
+# Canonical form: forward slashes, and a drive letter folded to the /c/... form
+# that Git Bash itself uses.
+norm(){
+  printf '%s' "$1" | tr '\\' '/' | sed -E 's#^([A-Za-z]):/#/\L\1/#'
+}
 
 # The project root is the kit's own location, not wherever git happens to think.
 # A home directory that is not a repository used to resolve to itself, which made

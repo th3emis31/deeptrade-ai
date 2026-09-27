@@ -41,3 +41,11 @@
 - Do not hardcode an install location. Git for Windows lives in Program Files for a system
   install and in AppData\Local\Programs for a per-user one; telling the owner the wrong path
   cost a terminal restart for nothing. Derive the path from where the tool actually is.
+- Git Bash reports paths as /c/Users/... while Claude Code passes C:\Users\..., so comparing
+  them never matches. Canonicalise a drive letter to the /c/ form before any path comparison,
+  or the project-relative path stays absolute and backups land in a directory named "C:".
+- Never police test files for duplicate definitions. Two pytest modules each defining a
+  fixture called client() or app() is the normal shape of a suite, and blocking it teaches
+  everyone to ignore the hook.
+- A guardrail is only proven by its log. The hook log showed both of these within minutes of
+  the hooks running for the first time; neither was visible from reading the code.
